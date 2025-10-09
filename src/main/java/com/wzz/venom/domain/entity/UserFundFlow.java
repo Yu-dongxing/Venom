@@ -4,6 +4,7 @@ package com.wzz.venom.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.wzz.venom.annotation.ColumnComment;
+import com.wzz.venom.annotation.DefaultValue;
 import com.wzz.venom.annotation.TableComment;
 import com.wzz.venom.common.BaseEntity; // 假设您有类似的基类
 import lombok.Data;
@@ -21,16 +22,18 @@ import java.time.LocalDateTime;
 @TableName("user_fund_flow")
 @TableComment("用户资金流水表")
 public class UserFundFlow extends BaseEntity { // 建议继承统一的BaseEntity
-
-    /**
-     * 主键ID
-     * 此字段已从 BaseEntity 继承。
-     */
-
     /** 用户名 */
     @ColumnComment("用户名")
     @TableField("user_name")
-    private String userName; // 字段名从 user 修改为 userName
+    private String userName;
+
+    /**
+     * 用户id
+     */
+    @ColumnComment("用户id")
+    @TableField("user_id")
+    private Long userId;
+
 
     /** 业务关联ID（例如订单ID、理财产品ID等） */
     @ColumnComment("业务关联ID")
@@ -40,12 +43,8 @@ public class UserFundFlow extends BaseEntity { // 建议继承统一的BaseEntit
     /** 交易金额（正为收入，负为支出） */
     @ColumnComment("交易金额（正为收入，负为支出）")
     @TableField("amount")
-    private BigDecimal amount; // 必须使用 BigDecimal
-
-    /**
-     * 创建时间（交易时间）
-     * 此字段已从 BaseEntity 继承。
-     */
+    @DefaultValue("0")
+    private BigDecimal amount;
 
     /** 资金类型（例如：RECHARGE-充值/WITHDRAW-提现/PURCHASE-购买/REWARD-奖励等） */
     @ColumnComment("资金类型")

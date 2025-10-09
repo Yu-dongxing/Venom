@@ -12,13 +12,12 @@ import com.wzz.venom.annotation.DefaultValue;
 import com.wzz.venom.annotation.TableComment;
 import com.wzz.venom.common.BaseEntity;
 import com.wzz.venom.enums.UserStatusEnum;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @TableName("b_user")
 @TableComment("用户表")
@@ -31,40 +30,40 @@ public class User extends BaseEntity {
     /** 登录密码 */
     @ColumnComment("登录密码")
     @TableField("password")
+    @JsonIgnore
     private String password;
 
     /** 提现密码 */
     @ColumnComment("提现密码")
     @TableField("withdrawal_password")
+    @JsonIgnore
     private String withdrawalPassword;
 
     /** 银行卡号 */
     @ColumnComment("银行卡号")
     @TableField("bank_card")
+    @DefaultValue("0")
     private String bankCard;
 
     /** 账户余额 */
     @ColumnComment("账户余额")
     @TableField("balance")
-    private Double balance;
+    @DefaultValue("0")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "0.00")//json返回时保留两位
+    private BigDecimal balance;
 
     /** 信用分数 */
     @ColumnComment("信用分数")
     @TableField("credit_score")
+    @DefaultValue("0")
     private Integer creditScore;
 
 
     /** 账户状态（0-正常 1-冻结 2-注销） */
     @ColumnComment("账户状态（0-正常 1-冻结 2-注销）")
     @TableField("account_status")
+    @DefaultValue("0")
     private Integer accountStatus;
 
-    /**
-     * 用户状态 (NORMAL-正常/FROZEN-冻结/CANCELLED-注销)
-     */
-    @ColumnComment("用户状态 (NORMAL-正常/FROZEN-冻结/CANCELLED-注销)")
-    @TableField("status")
-    @DefaultValue("'NORMAL'") // 2. 添加默认值 'NORMAL' (SQL中为字符串)
-    private UserStatusEnum status; // 3. 添加 status 字段，类型为 UserStatusEnum
 
 }

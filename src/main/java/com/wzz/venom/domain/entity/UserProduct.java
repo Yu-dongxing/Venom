@@ -24,13 +24,6 @@ import java.time.LocalDateTime;
 @TableComment("用户持有产品表")
 public class UserProduct extends BaseEntity { // 建议继承统一的BaseEntity，便于统一处理公共字段如ID、创建时间等
 
-    /**
-     * 主键ID
-     * 在你的BaseEntity中可能已经定义，这里作为示例补充
-     * @TableId(value = "id", type = IdType.AUTO)
-     * private Long id;
-     */
-
     /** 用户名 */
     @ColumnComment("用户名")
     @TableField("user_name") // 数据库字段名建议使用下划线命名法
@@ -66,15 +59,6 @@ public class UserProduct extends BaseEntity { // 建议继承统一的BaseEntity
     @ColumnComment("预期收益")
     @TableField("income")
     private Double income; // 收益同样建议使用 BigDecimal
-
-    /**
-     * 创建时间
-     * 在你的BaseEntity中可能已经定义，这里作为示例补充
-     * @ColumnComment("创建时间")
-     * @TableField(value = "create_time", fill = FieldFill.INSERT) // 假设使用MyBatis-Plus自动填充
-     * @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-     * private LocalDateTime createTime;
-     */
 
 
     /** 状态（0-持有中，1-已结束） */

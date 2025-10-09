@@ -1,15 +1,18 @@
 package com.wzz.venom.service.impl.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.wzz.venom.domain.entity.UserFundFlow;
 import com.wzz.venom.mapper.UserFundFlowMapper;
 import com.wzz.venom.service.user.UserFundFlowService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 用户资金流水服务实现类
@@ -19,136 +22,158 @@ import java.util.List;
 @Service
 public class UserFundFlowServiceImpl implements UserFundFlowService {
 
-    private final UserFundFlowMapper userFundFlowMapper;
-
-    // 推荐使用构造函数注入，更符合Spring的最佳实践
     @Autowired
-    public UserFundFlowServiceImpl(UserFundFlowMapper userFundFlowMapper) {
-        this.userFundFlowMapper = userFundFlowMapper;
-    }
+    private UserFundFlowMapper userFundFlowMapper;
 
-    /**
-     * 新增用户理财流水记录
-     * 注意：接口定义为UserFinancialStatement，但根据上下文实体应为UserFundFlow
-     * @param statement 理财流水对象
-     * @return 是否成功
-     */
+    // --- 定义常量以避免魔术值 ---
+    /** 资金类型：提现 */
+    private static final String FUND_TYPE_WITHDRAW = "WITHDRAW";
+    /** 资金类型：提现失败退款 */
+    private static final String FUND_TYPE_WITHDRAW_REFUND = "WITHDRAW_REFUND";
+    /** 资金类型：通用收入 */
+    private static final String FUND_TYPE_INCOME = "INCOME";
+    /** 资金类型：通用支出 */
+    private static final String FUND_TYPE_EXPENSE = "EXPENSE";
+
+    /** 状态：成功 */
+    private static final int STATUS_SUCCESS = 0;
+    /** 状态：处理中 */
+    private static final int STATUS_PROCESSING = 1;
+    /** 状态：失败 */
+    private static final int STATUS_FAILED = 2;
+    /** 状态：提现申请通过 */
+    private static final int WITHDRAW_STATUS_APPROVED = 2;
+    /** 状态：提现申请拒绝 */
+    private static final int WITHDRAW_STATUS_REJECTED = 3;
+
+
+    @Override
     @Transactional
-    @Override
-    public boolean addUserFinancialStatements(UserFundFlow statement) {
-        // MyBatis Plus的insert方法返回值是受影响的行数，大于0即为成功
-        return userFundFlowMapper.insert(statement) > 0;
+    public boolean addUserFundFlow(UserFundFlow fundFlow) {
+        return userFundFlowMapper.insert(fundFlow) > 0;
     }
 
-    /**
-     * 更新用户理财流水记录
-     * @param statement 理财流水对象
-     * @return 是否成功
-     */
+    @Override
     @Transactional
-    @Override
-    public boolean updateUserFinancialStatements(UserFundFlow statement) {
-        // 根据ID更新，返回受影响行数
-        return userFundFlowMapper.updateById(statement) > 0;
+    public boolean updateUserFundFlow(UserFundFlow fundFlow) {
+        // 确保传入的对象有主键ID
+        if (fundFlow.getId() == null) {
+            return false;
+        }
+        return userFundFlowMapper.updateById(fundFlow) > 0;
     }
 
-    /**
-     * 查询指定用户的理财流水列表
-     * @param user 用户名
-     * @return 理财流水列表
-     */
     @Override
-    public List<UserFundFlow> queryTheDesignatedUserSFinancialStatementList(String user) {
-        // 使用QueryWrapper构造查询条件
+    public List<UserFundFlow> queryTheUserSFundFlowList(String user) {
         QueryWrapper<UserFundFlow> queryWrapper = new QueryWrapper<>();
-        // "user_name" 是数据库中的字段名
-        queryWrapper.eq("user_name", user);
-        // 按创建时间倒序排列，让最新的流水显示在最前面
-        queryWrapper.orderByDesc("create_time");
+        queryWrapper.eq("user_name", user)
+                .orderByDesc("create_time"); // 按创建时间降序排序
         return userFundFlowMapper.selectList(queryWrapper);
     }
 
-    /**
-     * 删除指定编号的理财流水记录
-     * @param id 流水ID
-     * @return 是否成功
-     */
     @Override
-    @Transactional // 删除操作，建议加上事务
-    public boolean deleteSpecifiedNumberInformation(Long id) {
-        return userFundFlowMapper.deleteById(id) > 0;
+    public List<UserFundFlow> queryAllWithdrawalTransactionInformation() {
+        QueryWrapper<UserFundFlow> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("fund_type", FUND_TYPE_WITHDRAW)
+                .orderByDesc("create_time");
+        return userFundFlowMapper.selectList(queryWrapper);
     }
 
-    /**
-     * 增加用户交易金额（记录正向流水）
-     * 方法名建议修改为 recordIncomeFlow 或类似名称
-     * @param user 用户名
-     * @param amount 增加金额
-     * @return 是否成功
-     */
     @Override
-    @Transactional(rollbackFor = Exception.class) // 资金操作，必须有事务，并指定回滚的异常类型
-    public boolean increaseUserUnderstandingOfTransactionAmount(String user, Double amount) {
-        if (amount <= 0) {
-            // 金额必须是正数
-            // 可以抛出自定义异常或返回false
+    @Transactional
+    public boolean modifyUserWithdrawalStatus(String user, Integer status) {
+        // 业务假设：修改用户最新一笔“处理中”的提现请求的状态
+        UserFundFlow latestWithdrawal = userFundFlowMapper.selectOne(
+                new QueryWrapper<UserFundFlow>()
+                        .eq("user_name", user)
+                        .eq("fund_type", FUND_TYPE_WITHDRAW)
+                        .eq("status", STATUS_PROCESSING) // 查找“处理中”的记录
+                        .orderByDesc("create_time")
+                        .last("limit 1")
+        );
+
+        if (Objects.isNull(latestWithdrawal)) {
+            // 没有找到符合条件的提现记录
             return false;
         }
 
-        // TODO: 实际业务中，此处应该先查询用户当前余额，然后计算新余额。
-        // 由于缺少用户余额表，这里仅作演示。
-        BigDecimal currentBalance = BigDecimal.ZERO; // 假设从用户服务查到的当前余额为0
+        // 拒绝提现时，需要返还余额
+        if (WITHDRAW_STATUS_REJECTED == status) {
+            // 提现金额是负数，返还时应使用其绝对值
+            refuseToWithdrawAndReturnBalance(user, latestWithdrawal.getAmount().abs().doubleValue());
+        }
 
-        UserFundFlow flow = new UserFundFlow();
-        flow.setUserName(user);
-        // 关键：将接口传入的Double转换为BigDecimal进行计算，避免精度问题
-        flow.setAmount(BigDecimal.valueOf(amount));
-        flow.setFundType("INCOME"); // 资金类型，建议使用枚举或常量定义
-        flow.setDescription("用户收入"); // 交易描述
-        flow.setStatus(0); // 状态：0-成功
-        // 计算操作后余额
-        flow.setBalance(currentBalance.add(flow.getAmount()));
-
-        return userFundFlowMapper.insert(flow) > 0;
+        latestWithdrawal.setStatus(status);
+        return userFundFlowMapper.updateById(latestWithdrawal) > 0;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean increaseUserTransactionAmount(String user, Double amount, String describe) {
+        // 使用 BigDecimal 保证精度
+        BigDecimal transactionAmount = BigDecimal.valueOf(amount);
+        return addFlowRecord(user, transactionAmount, FUND_TYPE_INCOME, describe);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean reduceUserTransactionAmount(String user, Double amount, String describe) {
+        // 减少金额，传入的 amount 为正数，内部处理为负
+        BigDecimal transactionAmount = BigDecimal.valueOf(amount).negate();
+        return addFlowRecord(user, transactionAmount, FUND_TYPE_EXPENSE, describe);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean refuseToWithdrawAndReturnBalance(String user, Double amount) {
+        // 返还余额，本质是增加一笔正向流水
+        BigDecimal returnAmount = BigDecimal.valueOf(amount);
+        return addFlowRecord(user, returnAmount, FUND_TYPE_WITHDRAW_REFUND, "提现拒绝，资金返还");
+    }
+
+
     /**
-     * 减少用户交易金额（记录负向流水）
-     * 方法名建议修改为 recordExpenseFlow 或类似名称
-     * @param user 用户名
-     * @param amount 减少金额
+     * 核心私有方法：新增一条资金流水记录
+     * 封装了查询余额、计算新余额、检查余额、插入流水的原子操作
+     *
+     * @param userName 用户名
+     * @param transactionAmount 交易金额（正为收入，负为支出）
+     * @param fundType 资金类型
+     * @param description 描述
      * @return 是否成功
      */
-    @Override
-    @Transactional(rollbackFor = Exception.class) // 资金操作，必须有事务
-    public boolean reduceUserUnderstandingOfTransactionAmounts(String user, Double amount) {
-        if (amount <= 0) {
-            // 金额必须是正数
-            return false;
+    private boolean addFlowRecord(String userName, BigDecimal transactionAmount, String fundType, String description) {
+        // 1. 获取用户最新的资金流水，以确定当前余额
+        // 使用 "order by id desc" 替代 "create_time" 在高并发下更可靠
+        UserFundFlow lastFlow = userFundFlowMapper.selectOne(
+                new QueryWrapper<UserFundFlow>()
+                        .eq("user_name", userName)
+                        .orderByDesc("id")
+                        .last("limit 1")
+        );
+
+        // 2. 计算当前余额
+        BigDecimal currentBalance = (lastFlow != null) ? lastFlow.getBalance() : BigDecimal.ZERO;
+
+        // 3. 计算交易后新余额
+        BigDecimal newBalance = currentBalance.add(transactionAmount);
+
+        // 4. 如果是支出，检查余额是否充足
+        if (transactionAmount.compareTo(BigDecimal.ZERO) < 0 && newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            // 抛出异常，触发事务回滚
+            throw new RuntimeException("账户余额不足，操作失败！");
         }
 
-        // TODO: 实际业务中，应先查询用户当前余额，并判断余额是否充足。
-        BigDecimal currentBalance = new BigDecimal("1000"); // 假设从用户服务查到的当前余额为1000
+        // 5. 构建新的资金流水实体
+        UserFundFlow newFlow = new UserFundFlow();
+        newFlow.setUserName(userName);
+        newFlow.setAmount(transactionAmount);
+        newFlow.setBalance(newBalance); // 操作后的最终余额
+        newFlow.setFundType(fundType);
+        newFlow.setDescription(description);
+        newFlow.setStatus(STATUS_SUCCESS); // 默认为成功状态
 
-        BigDecimal expenseAmount = BigDecimal.valueOf(amount);
-
-        // 判断余额是否足够
-        if (currentBalance.compareTo(expenseAmount) < 0) {
-            // 余额不足，可以抛出业务异常
-            // throw new InsufficientBalanceException("用户余额不足");
-            return false;
-        }
-
-        UserFundFlow flow = new UserFundFlow();
-        flow.setUserName(user);
-        // 支出流水的amount字段记录为负数
-        flow.setAmount(expenseAmount.negate());
-        flow.setFundType("EXPENSE"); // 资金类型
-        flow.setDescription("用户支出"); // 交易描述
-        flow.setStatus(0); // 状态：0-成功
-        // 计算操作后余额
-        flow.setBalance(currentBalance.subtract(expenseAmount));
-
-        return userFundFlowMapper.insert(flow) > 0;
+        // 6. 插入新的流水记录
+        return userFundFlowMapper.insert(newFlow) > 0;
     }
 }

@@ -39,10 +39,17 @@ public class UserController {
             if (!isValid) {
                 return Result.error("用户名或密码错误");
             }
+            /**
+             * 根据用户名查询用户
+             */
+            User u = userService.selectByUserName(userDTO);
+            if (u==null){
+                return Result.error("没有查询到该用户消息");
+            }
 
             // 2. 登录成功，使用 Sa-Token 生成 Token
             // 我们使用 userName 作为 loginId，因为 service 层的方法多是基于 userName 操作的
-            StpUtil.login(userDTO.getUserName());
+            StpUtil.login(u.getId());
             String tokenValue = StpUtil.getTokenValue();
 
             // 3. 封装 Token 信息并返回
@@ -53,10 +60,10 @@ public class UserController {
             return Result.success("登录成功", tokenMap);
         } catch (BusinessException e) {
             log.error("登录业务异常: {}", e.getMessage());
-            return Result.error(e.getCode(), e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("登录时发生未知错误", e);
-            return Result.error(500, "系统繁忙，请稍后再试");
+            return Result.error(500, "登录时发生错误");
         }
     }
 

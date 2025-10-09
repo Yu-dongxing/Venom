@@ -2,6 +2,7 @@ package com.wzz.venom.common;
 
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -16,8 +17,8 @@ public abstract class BaseEntity implements Serializable {
     /**
      * 主键id
      */
-    @TableId
     @ColumnComment("主键ID")
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     /**

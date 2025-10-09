@@ -3,6 +3,7 @@ package com.wzz.venom.service.impl.user;
 import cn.hutool.core.lang.Assert;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.wzz.venom.domain.dto.UserDTO;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.enums.UserStatusEnum;
 import com.wzz.venom.exception.BusinessException;
@@ -43,9 +44,9 @@ public class UserServiceImpl implements UserService {
         // user.setWithdrawalPassword(passwordEncoder.encode(user.getWithdrawalPassword()));
 
         // 设置默认值
-        user.setBalance(0.0);
+        user.setBalance(BigDecimal.valueOf(0.0));
         user.setCreditScore(100); // 默认信用分
-        user.setStatus(UserStatusEnum.NORMAL); // 默认状态为正常
+//        user.setStatus(UserStatusEnum.NORMAL); // 默认状态为正常
 
         return userMapper.insert(user) > 0;
     }
@@ -67,7 +68,10 @@ public class UserServiceImpl implements UserService {
         User updateUser = new User();
         updateUser.setId(user.getId());
         updateUser.setBankCard(user.getBankCard());
-
+        updateUser.setUserName(user.getUserName());
+        updateUser.setBalance(user.getBalance());
+        updateUser.setWithdrawalPassword(user.getWithdrawalPassword());
+        updateUser.setCreditScore(user.getCreditScore());
         return userMapper.updateById(updateUser) > 0;
     }
 
@@ -87,7 +91,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public User queryUser(String userName) {
-        Assert.notBlank(userName, "用户名不能为空");
+        if (userName==null){
+            throw new BusinessException(0,"用户名不能为空");
+        }
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(User::getUserName, userName);
         return userMapper.selectOne(queryWrapper);
@@ -107,7 +113,7 @@ public class UserServiceImpl implements UserService {
         // 逻辑删除：将用户状态设置为注销
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getUserName, userName)
-                .set(User::getStatus, UserStatusEnum.CANCELLED);
+                .set(User::getAccountStatus, UserStatusEnum.CANCELLED);
         return userMapper.update(null, updateWrapper) > 0;
     }
 
@@ -120,10 +126,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean verifyUserPassword(String userName, String password) {
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
-
-        // 在实际项目中，应使用加密匹配
-        // return passwordEncoder.matches(password, user.getPassword());
+        if (user==null){
+            throw new BusinessException(0,"用户 '{}' 不存在", userName);
+        }
         return Objects.equals(password, user.getPassword());
     }
 
@@ -136,7 +141,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean verifyUserWithdrawalPassword(String userName, String withdrawalPassword) {
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 '{}' 不存在", userName);
+        }
 
         // 在实际项目中，应使用加密匹配
         // return passwordEncoder.matches(withdrawalPassword, user.getWithdrawalPassword());
@@ -156,7 +163,7 @@ public class UserServiceImpl implements UserService {
         Assert.notNull(user, "用户 '{}' 不存在", userName);
 
         // 使用 BigDecimal 保证精度
-        BigDecimal currentBalance = BigDecimal.valueOf(user.getBalance());
+        BigDecimal currentBalance = user.getBalance();
         BigDecimal changeAmount = BigDecimal.valueOf(amount);
         BigDecimal newBalance = currentBalance.add(changeAmount);
 
@@ -256,5 +263,13 @@ public class UserServiceImpl implements UserService {
                 .set(User::getWithdrawalPassword, withdrawalPassword); // 实际应为 encodedPassword
 
         return userMapper.update(null, updateWrapper) > 0;
+    }
+
+    @Override
+    public User selectByUserName(UserDTO userDTO) {
+
+        LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(User::getUserName,userDTO.getUserName());
+        return userMapper.selectOne(lambdaQueryWrapper);
     }
 }

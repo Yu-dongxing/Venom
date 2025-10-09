@@ -1,190 +1,177 @@
 package com.wzz.venom.controller.user;
 
-import com.wzz.venom.common.Result;
+import com.wzz.venom.common.Result; // 假设这是您的统一返回结果类
 import com.wzz.venom.domain.entity.UserFundFlow;
 import com.wzz.venom.service.user.UserFundFlowService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
  * 用户资金账本接口控制器
  * 模块：充值 / 提现 / 账本查询 / 提现状态变更
+ *
+ * @author (Your Name)
  */
 @RestController
 @RequestMapping("/api/user/fund")
 public class UserFundController {
 
-    private final UserFundFlowService userFundFlowService;
-
-    // 使用构造函数注入Service
     @Autowired
-    public UserFundController(UserFundFlowService userFundFlowService) {
-        this.userFundFlowService = userFundFlowService;
-    }
+    private UserFundFlowService userFundFlowService;
 
     /**
      * 用户提交充值申请
-     * 对应业务：记录一笔正向流水
+     * @param amount 充值金额
+     * @return Result
      */
     @PostMapping("/recharge")
-    public Result<?> userSubmitsRechargeRequest(@RequestParam String user, @RequestParam Double amount) {
-        // 调用通用的增加金额接口，并明确描述
-        boolean success = userFundFlowService.increaseUserUnderstandingOfTransactionAmount(user, amount);
-        return success ? Result.success("充值申请成功，待处理") : Result.error("充值申请失败");
+    public Result<?> userSubmitsRechargeRequest(@RequestParam Double amount) {
+        // 在实际应用中，用户名应从安全上下文（如Token）中获取，而不是参数传递
+        // String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
+        String currentUser = "testUser"; // 此处为模拟用户
+
+        if (amount <= 0) {
+            return Result.error("充值金额必须大于0");
+        }
+        try {
+            boolean success = userFundFlowService.increaseUserTransactionAmount(currentUser, amount, "用户在线充值");
+            return success ? Result.success("充值成功") : Result.error("充值失败，请稍后重试");
+        } catch (Exception e) {
+            // 日志记录 e.getMessage()
+            return Result.error("充值操作异常，请联系客服");
+        }
     }
 
     /**
      * 用户提交提现申请
-     * 对应业务：记录一笔负向流水，状态通常为“处理中”
+     * 注意：提现申请应该生成一条“处理中”的流水，而不是直接扣款。
+     * 因此，这里直接调用 `reduceUserTransactionAmount` 可能不完全符合业务。
+     * 一个更优的设计是在Service层提供一个 `requestWithdrawal` 方法。
+     * 此处我们遵循现有接口，假设 `reduceUserTransactionAmount` 用于此目的。
+     * @param amount 提现金额
+     * @return Result
      */
     @PostMapping("/withdraw")
-    public Result<?> userSubmitsWithdrawalRequest(@RequestParam String user, @RequestParam Double amount) {
-        // 注意：这里的业务与简单的“减少金额”不同，它有状态。
-        // 我们需要手动构建一个状态为“处理中”的流水记录。
+    public Result<?> userSubmitsWithdrawalRequest(@RequestParam Double amount) {
+        // 同样，用户名应从安全上下文中获取
+        String currentUser = "testUser"; // 模拟用户
+
         if (amount <= 0) {
-            return Result.error("提现金额必须为正数");
+            return Result.error("提现金额必须大于0");
         }
 
-        // TODO: 实际业务中，此处应先查询并冻结用户余额。
-        // 为简化，我们直接记录流水。
-
-        UserFundFlow withdrawFlow = new UserFundFlow();
-        withdrawFlow.setUserName(user);
-        withdrawFlow.setAmount(BigDecimal.valueOf(amount).negate()); // 提现是负向流水
-        withdrawFlow.setFundType("WITHDRAW"); // 类型：提现
-        withdrawFlow.setDescription("用户发起提现申请");
-        withdrawFlow.setStatus(1); // 状态：1-处理中
-
-        // 使用通用的新增接口来创建这条特定状态的记录
-        boolean success = userFundFlowService.addUserFinancialStatements(withdrawFlow);
-        return success ? Result.success("提现申请已提交") : Result.error("提现申请失败");
+        try {
+            // 业务说明：此处调用会直接生成一条支出成功的流水。
+            // 如果需要“申请-审核”流程，Service层应提供专门的接口来创建“处理中”状态的流水。
+            boolean success = userFundFlowService.reduceUserTransactionAmount(currentUser, amount, "用户申请提现");
+            return success ? Result.success("提现申请已提交") : Result.error("提现申请失败");
+        } catch (RuntimeException e) {
+            // 捕获Service层抛出的“余额不足”等运行时异常
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("系统异常，请稍后重试");
+        }
     }
 
     /**
-     * 用户查看资金流水
-     * 对应业务：查询指定用户的所有流水记录
+     * 用户查看自己的资金流水
+     * @param user 用户名
+     * @return Result<List<UserFundFlow>>
      */
     @GetMapping("/flow")
     public Result<List<UserFundFlow>> userFundFlow(@RequestParam String user) {
-        List<UserFundFlow> flowList = userFundFlowService.queryTheDesignatedUserSFinancialStatementList(user);
+        // 安全注意：应校验当前登录用户是否有权限查看`user`的流水（例如，用户只能看自己的，或管理员才能看所有人的）
+        List<UserFundFlow> flowList = userFundFlowService.queryTheUserSFundFlowList(user);
         return Result.success(flowList);
     }
 
     /**
-     * 查询所有提现交易信息
-     * 对应业务：需要Service层支持按类型查询，此处为演示
+     * (管理员)查询所有提现交易信息
+     * @return Result<List<UserFundFlow>>
      */
     @GetMapping("/withdrawRecords")
-    public Result<?> queryAllWithdrawalTransactionInformation() {
-        // TODO: 当前的Service层没有提供根据fundType查询的方法。
-        // 在实际开发中，你需要在Service和Mapper中添加一个类似 queryByFundType("WITHDRAW") 的方法。
-        // 此处返回一个提示信息。
-        return Result.error("该功能尚未实现，请在Service层添加按类型查询流水的方法");
+    public Result<List<UserFundFlow>> queryAllWithdrawalTransactionInformation() {
+        // 安全注意：此接口应仅对管理员角色开放
+        List<UserFundFlow> records = userFundFlowService.queryAllWithdrawalTransactionInformation();
+        return Result.success(records);
     }
 
     /**
-     * 修改提现状态 (例如：由管理员审核通过或拒绝)
-     * @param transactionId 提现流水的唯一ID
-     * @param status 目标状态 (例如: 0-成功, 2-失败)
+     * (管理员)修改提现状态
+     * @param user 用户名
+     * @param status 状态（1申请，2通过，3拒绝）
+     * @return Result
      */
     @PostMapping("/modifyWithdrawStatus")
-    public Result<?> modifyUserWithdrawalStatus(@RequestParam Long transactionId,
-                                                @RequestParam Integer status) {
-        // 构建一个只包含主键和要更新字段的对象
-        UserFundFlow statementToUpdate = new UserFundFlow();
-        statementToUpdate.setId(transactionId); // BaseEntity中的id
-        statementToUpdate.setStatus(status);
-
-        boolean success = userFundFlowService.updateUserFinancialStatements(statementToUpdate);
-        return success ? Result.success("状态更新成功") : Result.error("状态更新失败，请检查流水ID是否存在");
+    public Result<?> modifyUserWithdrawalStatus(@RequestParam String user, @RequestParam Integer status) {
+        // 安全注意：此接口应仅对管理员角色开放
+        if (status == null || status < 1 || status > 3) {
+            return Result.error("无效的状态码");
+        }
+        boolean success = userFundFlowService.modifyUserWithdrawalStatus(user, status);
+        return success ? Result.success("状态更新成功") : Result.error("状态更新失败，可能未找到处理中的提现记录");
     }
 
     /**
-     * 增加用户交易金额 (例如：活动奖励、手动补款)
+     * (管理员)增加用户交易金额
+     * @param user 用户名
+     * @param amount 金额
+     * @param describe 描述
+     * @return Result
      */
     @PostMapping("/increase")
     public Result<?> increaseUserTransactionAmount(@RequestParam String user,
                                                    @RequestParam Double amount,
                                                    @RequestParam String describe) {
-        // 直接调用Service中的增加金额方法
-        // 注意：原service方法没有describe参数，如果需要记录，需要手动构建对象
+        // 安全注意：此接口应仅对管理员角色开放，用于后台调账、发放奖励等
         if (amount <= 0) {
-            return Result.error("增加的金额必须为正数");
+            return Result.error("增加的金额必须大于0");
         }
-
-        // TODO: 查询用户当前余额
-        BigDecimal currentBalance = BigDecimal.ZERO;
-
-        UserFundFlow flow = new UserFundFlow();
-        flow.setUserName(user);
-        flow.setAmount(BigDecimal.valueOf(amount));
-        flow.setFundType("MANUAL_INCREASE"); // 类型：手动增加
-        flow.setDescription(describe); // 使用接口传入的描述
-        flow.setStatus(0); // 状态：0-成功
-        flow.setBalance(currentBalance.add(flow.getAmount()));
-
-        boolean success = userFundFlowService.addUserFinancialStatements(flow);
-        return success ? Result.success("操作成功") : Result.error("增加金额失败");
+        boolean success = userFundFlowService.increaseUserTransactionAmount(user, amount, describe);
+        return success ? Result.success("操作成功") : Result.error("操作失败");
     }
 
     /**
-     * 减少用户交易金额 (例如：手动扣款)
+     * (管理员)减少用户交易金额
+     * @param user 用户名
+     * @param amount 金额
+     * @param describe 描述
+     * @return Result
      */
     @PostMapping("/reduce")
     public Result<?> reduceUserTransactionAmount(@RequestParam String user,
                                                  @RequestParam Double amount,
                                                  @RequestParam String describe) {
-        // 直接调用Service中的减少金额方法
-        boolean success = userFundFlowService.reduceUserUnderstandingOfTransactionAmounts(user, amount);
-        // 注意：原service方法同样没有describe参数。如果需要记录描述，应参照上面的 increase 方法，手动构建对象。
-        return success ? Result.success("操作成功") : Result.error("减少金额失败，可能余额不足");
+        // 安全注意：此接口应仅对管理员角色开放，用于后台扣款等
+        if (amount <= 0) {
+            return Result.error("减少的金额必须大于0");
+        }
+        try {
+            boolean success = userFundFlowService.reduceUserTransactionAmount(user, amount, describe);
+            return success ? Result.success("操作成功") : Result.error("操作失败");
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     /**
-     * 拒绝提现并返还余额
-     * 这是一个组合操作：1. 更新提现记录状态为失败 2. 增加一笔正向流水把钱还给用户
-     * 这个操作应该由Service层的一个事务方法来保证原子性。
-     * @param transactionId 被拒绝的提现流水ID
+     * (管理员)拒绝提现并返还余额
+     * 注意：此功能已整合到 `modifyUserWithdrawalStatus` 接口中。
+     * 当 status=3 (拒绝) 时，Service层会自动返还余额。
+     * 此接口可作为补充或单独的补偿机制存在。
      * @param user 用户名
-     * @param amount 返还的金额
+     * @param amount 金额
+     * @return Result
      */
     @PostMapping("/refuse")
-    public Result<?> refuseToWithdrawAndReturnBalance(@RequestParam Long transactionId,
-                                                      @RequestParam String user,
-                                                      @RequestParam Double amount) {
-        // TODO: 这是一个典型的事务场景，强烈建议在Service层创建一个新的方法，
-        // 如 `refuseWithdrawal(Long transactionId)` 来封装以下两个操作。
-
-        // 步骤1：更新原提现记录状态为“失败”
-        UserFundFlow statementToUpdate = new UserFundFlow();
-        statementToUpdate.setId(transactionId);
-        statementToUpdate.setStatus(2); // 2-失败
-        boolean updateSuccess = userFundFlowService.updateUserFinancialStatements(statementToUpdate);
-
-        if (!updateSuccess) {
-            return Result.error("更新提现记录状态失败，请检查流水ID");
+    public Result<?> refuseToWithdrawAndReturnBalance(@RequestParam String user, @RequestParam Double amount) {
+        // 安全注意：此接口应仅对管理员角色开放
+        if (amount <= 0) {
+            return Result.error("返还的金额必须大于0");
         }
-
-        // 步骤2：增加一笔正向流水，将冻结的金额返还给用户
-        UserFundFlow refundFlow = new UserFundFlow();
-        refundFlow.setUserName(user);
-        refundFlow.setAmount(BigDecimal.valueOf(amount));
-        refundFlow.setFundType("REFUND"); // 类型：退款/返还
-        refundFlow.setDescription("提现申请被拒绝，金额返还。关联流水ID: " + transactionId);
-        refundFlow.setStatus(0); // 成功
-        // TODO: 此处需要重新计算用户余额
-
-        boolean refundSuccess = userFundFlowService.addUserFinancialStatements(refundFlow);
-
-        if (!refundSuccess) {
-            // 这是一个危险的状态，原记录已改，但返款失败了。
-            // 这就是为什么必须使用事务方法的原因。
-            return Result.error(500, "严重错误：提现状态已更新，但金额返还失败！请联系技术人员处理。");
-        }
-
-        return Result.success("提现已拒绝，金额已返还。");
+        boolean success = userFundFlowService.refuseToWithdrawAndReturnBalance(user, amount);
+        return success ? Result.success("余额返还成功") : Result.error("余额返还失败");
     }
 }

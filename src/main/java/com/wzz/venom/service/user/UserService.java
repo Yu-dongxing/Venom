@@ -96,4 +96,6 @@ public interface UserService {
      * @return 是否成功
      */
     boolean changeUserWithdrawalPassword(String userName, String withdrawalPassword);
+
+    User selectByUserName(UserDTO userDTO);
 }
