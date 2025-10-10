@@ -46,7 +46,7 @@ public class UserFundFlow extends BaseEntity { // 建议继承统一的BaseEntit
     @DefaultValue("0")
     private BigDecimal amount;
 
-    /** 资金类型（例如：RECHARGE-充值/WITHDRAW-提现/PURCHASE-购买/REWARD-奖励等） */
+    /** 资金类型（例如：RECHARGE-充值/WITHDRAW-提现/PURCHASE-购买/REWARD-奖励/WITHDRAW_REFUND-提现拒绝等） */
     @ColumnComment("资金类型")
     @TableField("fund_type")
     private String fundType; // 建议使用枚举或常量字符串，而非魔术字符串

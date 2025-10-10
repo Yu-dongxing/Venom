@@ -75,9 +75,8 @@ public class AdminUserController {
     public Result<?> deleteUser(@RequestParam("user") String userName) {
         try {
             boolean success = userService.deleteUser(userName);
-            // 注意：原代码中的 deleteInfo 和 delete 接口功能重复，这里只实现一个 /delete 作为逻辑删除。
             return success ? Result.success() : Result.error("用户删除失败");
-        } catch (Exception e) {
+        } catch (BusinessException e) {
             log.error("删除用户失败", e);
             return Result.error(e.getMessage());
         }

@@ -80,6 +80,8 @@ public class UserController {
             user.setUserName(userDTO.getUserName());
             user.setPassword(userDTO.getPassword()); // 注意：实际生产中密码应加密存储
             user.setBankCard(userDTO.getBankCard());
+            user.setWithdrawalPassword(userDTO.getWithdrawalPassword());
+            user.setCreditScore(userDTO.getCreditScore());
             // 其他字段（如余额、信用分、状态）在 service 的 addUser 方法中设置了默认值
 
             // 2. 调用服务层进行注册
@@ -106,19 +108,20 @@ public class UserController {
             // 1. 确认用户已登录，否则 Sa-Token 会抛出异常
             StpUtil.checkLogin();
 
-            // 2. 获取当前登录用户的用户名
-            String userName = StpUtil.getLoginIdAsString();
-
-            // 3. 调用服务层修改密码
-            boolean success = userService.changeUserPassword(userName, userDTO.getPassword());
+            Long userId  = StpUtil.getLoginIdAsLong();
+            User user = userService.queryUserByUserId(userId);
+            if (Objects.isNull(user)) {
+                return Result.error(404, "无法获取用户信息，请重新登录");
+            }
+            boolean success = userService.changeUserPassword(user.getUserName(), userDTO.getPassword());
 
             return success ? Result.success("密码修改成功") : Result.error("密码修改失败");
         } catch (BusinessException e) {
             log.warn("修改密码业务异常 for user {}: {}", StpUtil.getLoginId(), e.getMessage());
-            return Result.error(e.getCode(), e.getMessage());
+            return Result.error( e.getMessage());
         } catch (Exception e) {
             log.error("修改密码时发生未知错误 for user " + StpUtil.getLoginId(), e);
-            return Result.error(500, "系统繁忙，请稍后再试");
+            return Result.error("修改密码时发生未知错误");
         }
     }
 
@@ -131,29 +134,18 @@ public class UserController {
         try {
             // 1. 确认用户已登录
             StpUtil.checkLogin();
-
-            // 2. 获取当前登录用户的用户名
-            String userName = StpUtil.getLoginIdAsString();
-
-            // 3. 查询用户详情
-            User user = userService.queryUser(userName);
-
+            Long userId  = StpUtil.getLoginIdAsLong();
+            User user = userService.queryUserByUserId(userId);
             if (Objects.isNull(user)) {
                 return Result.error(404, "无法获取用户信息，请重新登录");
             }
-
-            // 4. 数据脱敏：隐藏密码等敏感信息，防止泄露
-            // 在实际项目中，更推荐返回一个 UserVO (View Object) 来替代直接返回实体类
-            user.setPassword(null);
-            user.setWithdrawalPassword(null);
-
             return Result.success("获取成功", user);
         } catch (BusinessException e) {
             log.warn("获取用户详情业务异常 for user {}: {}", StpUtil.getLoginId(), e.getMessage());
-            return Result.error(e.getCode(), e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取用户详情时发生未知错误 for user " + StpUtil.getLoginId(), e);
-            return Result.error(500, "系统繁忙，请稍后再试");
+            return Result.error("获取用户详情时发生未知错误");
         }
     }
 }

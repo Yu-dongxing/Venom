@@ -2,9 +2,12 @@ package com.wzz.venom.service.impl.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.domain.entity.UserFinancial;
+import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.mapper.UserFinancialMapper;
 import com.wzz.venom.service.user.UserFinancialService;
+import com.wzz.venom.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +22,9 @@ public class UserFinancialServiceImpl implements UserFinancialService {
 
     @Autowired
     private UserFinancialMapper userFinancialMapper;
+
+    @Autowired
+    private UserService userService;
 
     /**
      * 新增用户理财信息
@@ -71,48 +77,29 @@ public class UserFinancialServiceImpl implements UserFinancialService {
         }
         return userFinancialMapper.selectList(queryWrapper);
     }
-
     /**
      * 扣减用户理财余额
-     * 这是一个简化实现，假设一个用户只有一条理财记录。
-     * 如果一个用户可以有多条，逻辑会更复杂，需要明确扣减哪一条记录。
-     * @param user 用户名
+     *
+     * @param user   用户名
      * @param amount 扣减金额
      * @return 是否成功
      */
     @Override
     @Transactional
     public boolean reduceUserFinancialBalance(String user, Double amount) {
+        // 1. 参数校验
         if (user == null || amount == null || amount <= 0) {
             return false;
         }
 
-        // 1. 先查询出用户的理财信息
-        List<UserFinancial> financials = queryTheDesignatedUserSFinancialInformation(user);
-        if (CollectionUtils.isEmpty(financials)) {
-            // 用户没有理财信息
-            return false;
-        }
-
-        // 假设只处理第一条理财记录
-        UserFinancial userFinancial = financials.get(0);
         BigDecimal deductionAmount = BigDecimal.valueOf(amount);
-
-        // 2. 检查余额是否充足
-        if (userFinancial.getAmount().compareTo(deductionAmount) < 0) {
-            // 余额不足
-            return false;
-        }
-
-        // 3. 计算新余额并更新
-        BigDecimal newAmount = userFinancial.getAmount().subtract(deductionAmount);
-
-        // 使用UpdateWrapper进行更新，可以附带乐观锁等防止并发问题
         UpdateWrapper<UserFinancial> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("id", userFinancial.getId()) // 定位到具体记录
-                .set("amount", newAmount); // 设置新值
-
-        return userFinancialMapper.update(null, updateWrapper) > 0;
+        updateWrapper
+                .eq("user", user)  // 定位到指定用户
+                .ge("amount", deductionAmount) // 关键：确保余额充足 (amount >= deductionAmount)
+                .setSql("amount = amount - " + deductionAmount.toPlainString()); // 执行扣减
+        int affectedRows = userFinancialMapper.update(null, updateWrapper);
+        return affectedRows > 0;
     }
 
     /**
@@ -143,35 +130,41 @@ public class UserFinancialServiceImpl implements UserFinancialService {
 
     /**
      * 增加用户理财余额
-     * 同样是简化实现，假设一个用户只有一条理财记录。
-     * @param user 用户名
+     * <p>
+     * 修改后的逻辑：
+     * 1. 查询用户的理财记录。
+     * 2. 如果记录不存在，则为该用户创建一条新的理财记录。
+     * 3. 如果记录已存在，则在原有金额上增加指定数额。
+     * </p>
+     *
+     * @param user   用户名
      * @param amount 增加金额
      * @return 是否成功
      */
     @Override
-    @Transactional
+    @Transactional // 事务注解，确保查询和后续操作的原子性
     public boolean increaseUserFinancialBalance(String user, Double amount) {
+        // 1. 参数校验
         if (user == null || amount == null || amount <= 0) {
             return false;
         }
-
         List<UserFinancial> financials = queryTheDesignatedUserSFinancialInformation(user);
-        if (CollectionUtils.isEmpty(financials)) {
-            return false;
-        }
-
-        // 假设只处理第一条记录
-        UserFinancial userFinancial = financials.get(0);
         BigDecimal increaseAmount = BigDecimal.valueOf(amount);
-        BigDecimal newAmount = userFinancial.getAmount().add(increaseAmount);
+        if (CollectionUtils.isEmpty(financials)) {
+            UserFinancial newUserFinancial = new UserFinancial();
+            newUserFinancial.setUserName(user);
+            newUserFinancial.setAmount(increaseAmount);
+            return userFinancialMapper.insert(newUserFinancial) > 0;
+        } else {
+            UserFinancial userFinancial = financials.get(0);
+            BigDecimal newAmount = userFinancial.getAmount().add(increaseAmount);
 
-        UpdateWrapper<UserFinancial> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("id", userFinancial.getId())
-                .set("amount", newAmount);
-
-        return userFinancialMapper.update(null, updateWrapper) > 0;
+            UpdateWrapper<UserFinancial> updateWrapper = new UpdateWrapper<>();
+            updateWrapper.eq("id", userFinancial.getId())
+                    .set("amount", newAmount);
+            return userFinancialMapper.update(null, updateWrapper) > 0;
+        }
     }
-
     /**
      * [新增] 查询所有用户理财信息 (供管理端使用)
      * @return 所有理财信息列表
@@ -194,5 +187,14 @@ public class UserFinancialServiceImpl implements UserFinancialService {
             return false;
         }
         return userFinancialMapper.deleteById(id) > 0;
+    }
+
+    @Override
+    public List<UserFinancial> queryTheDesignatedUserSFinancialInformationByuserId(Long userId, String currentUser) {
+        User s = userService.queryUserByUserId(userId);
+        if (s==null){
+            throw  new BusinessException(0,"查询不到该用户");
+        }
+        return this.queryTheDesignatedUserSFinancialInformation(s.getUserName());
     }
 }

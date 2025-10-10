@@ -69,4 +69,6 @@ public interface UserFinancialService {
      * @return 是否成功
      */
     boolean deleteFinancialInformationById(Long id);
+
+    List<UserFinancial> queryTheDesignatedUserSFinancialInformationByuserId(Long userId, String currentUser);
 }

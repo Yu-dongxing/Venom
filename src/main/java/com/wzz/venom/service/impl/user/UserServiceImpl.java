@@ -38,16 +38,8 @@ public class UserServiceImpl implements UserService {
         if (Objects.nonNull(existingUser)) {
             throw new BusinessException(0,"用户名 '" + user.getUserName() + "' 已存在");
         }
-
-        // 在实际项目中，密码必须经过加密处理（例如使用 BCrypt）
-        // user.setPassword(passwordEncoder.encode(user.getPassword()));
-        // user.setWithdrawalPassword(passwordEncoder.encode(user.getWithdrawalPassword()));
-
-        // 设置默认值
         user.setBalance(BigDecimal.valueOf(0.0));
         user.setCreditScore(100); // 默认信用分
-//        user.setStatus(UserStatusEnum.NORMAL); // 默认状态为正常
-
         return userMapper.insert(user) > 0;
     }
 
@@ -59,12 +51,16 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateUserInformation(User user) {
+        if (user.getId() == null){
+            throw new BusinessException(0,"用户ID不能为空");
+        }
         Assert.notNull(user.getId(), "用户ID不能为空");
         User dbUser = userMapper.selectById(user.getId());
-        Assert.notNull(dbUser, "更新的用户不存在");
 
-        // 此处只允许更新部分非敏感信息，如银行卡号等
-        // 密码、余额等应通过专用接口修改
+        if (dbUser == null){
+            throw new BusinessException(0,"更新的用户不存在");
+        }
+        Assert.notNull(dbUser, "更新的用户不存在");
         User updateUser = new User();
         updateUser.setId(user.getId());
         updateUser.setBankCard(user.getBankCard());
@@ -108,7 +104,9 @@ public class UserServiceImpl implements UserService {
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteUser(String userName) {
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
 
         // 逻辑删除：将用户状态设置为注销
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
@@ -127,7 +125,7 @@ public class UserServiceImpl implements UserService {
     public boolean verifyUserPassword(String userName, String password) {
         User user = this.queryUser(userName);
         if (user==null){
-            throw new BusinessException(0,"用户 '{}' 不存在", userName);
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
         }
         return Objects.equals(password, user.getPassword());
     }
@@ -142,7 +140,7 @@ public class UserServiceImpl implements UserService {
     public boolean verifyUserWithdrawalPassword(String userName, String withdrawalPassword) {
         User user = this.queryUser(userName);
         if (user==null){
-            throw new BusinessException(0,"用户 '{}' 不存在", userName);
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
         }
 
         // 在实际项目中，应使用加密匹配
@@ -160,7 +158,10 @@ public class UserServiceImpl implements UserService {
     @Transactional(rollbackFor = Exception.class)
     public boolean modifyUserBalance(String userName, Double amount) {
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
+//        Assert.notNull(user, "用户 '{}' 不存在", userName);
 
         // 使用 BigDecimal 保证精度
         BigDecimal currentBalance = user.getBalance();
@@ -190,7 +191,10 @@ public class UserServiceImpl implements UserService {
     public boolean modifyUserReputationScore(String userName, Integer creditScore) {
         Assert.notNull(creditScore, "信用分不能为空");
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
+//        Assert.notNull(user, "用户 '{}' 不存在", userName);
 
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getUserName, userName)
@@ -210,7 +214,10 @@ public class UserServiceImpl implements UserService {
     public boolean modifyTheUserSBankCard(String userName, String bankCard) {
         Assert.notBlank(bankCard, "银行卡号不能为空");
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
+//        Assert.notNull(user, "用户 '{}' 不存在", userName);
 
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getUserName, userName)
@@ -230,7 +237,10 @@ public class UserServiceImpl implements UserService {
     public boolean changeUserPassword(String userName, String password) {
         Assert.notBlank(password, "新密码不能为空");
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
+//        Assert.notNull(user, "用户 '{}' 不存在", userName);
 
         // 在实际项目中，密码必须经过加密处理
         // String encodedPassword = passwordEncoder.encode(password);
@@ -253,7 +263,10 @@ public class UserServiceImpl implements UserService {
     public boolean changeUserWithdrawalPassword(String userName, String withdrawalPassword) {
         Assert.notBlank(withdrawalPassword, "新提现密码不能为空");
         User user = this.queryUser(userName);
-        Assert.notNull(user, "用户 '{}' 不存在", userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
+//        Assert.notNull(user, "用户 '{}' 不存在", userName);
 
         // 在实际项目中，密码必须经过加密处理
         // String encodedPassword = passwordEncoder.encode(withdrawalPassword);
@@ -271,5 +284,16 @@ public class UserServiceImpl implements UserService {
         LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(User::getUserName,userDTO.getUserName());
         return userMapper.selectOne(lambdaQueryWrapper);
+    }
+    /**
+     * 根据id查询用户消息
+     */
+    @Override
+    public User queryUserByUserId(Long id) {
+        User s = userMapper.selectById(id);
+        if (s==null){
+            throw new BusinessException(0,"查询不到该用户");
+        }
+        return s;
     }
 }

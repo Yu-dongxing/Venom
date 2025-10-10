@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * webSocket测试接口（禁止使用）
+ * 测试 -  webSocket测试接口（禁止使用）
  */
 @RestController
 @RequestMapping("/api/cs/websocket")

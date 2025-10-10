@@ -63,6 +63,9 @@ public interface UserFundFlowService {
      */
     boolean reduceUserTransactionAmount(String user, Double amount, String describe);
 
+    @Transactional(rollbackFor = Exception.class)
+    boolean reduceUserTransactionAmountWITHDRA(String user, Double amount, String describe);
+
     /**
      * 提现拒绝并返还余额
      * @param user 用户名
@@ -70,4 +73,7 @@ public interface UserFundFlowService {
      * @return 是否成功
      */
     boolean refuseToWithdrawAndReturnBalance(String user, Double amount);
+
+    @Transactional(rollbackFor = Exception.class)
+    boolean modifyWithdrawalStatusById(Long flowId, Integer status);
 }

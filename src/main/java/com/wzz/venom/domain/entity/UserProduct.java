@@ -7,8 +7,10 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.wzz.venom.annotation.ColumnComment;
+import com.wzz.venom.annotation.DefaultValue;
 import com.wzz.venom.annotation.TableComment;
 import com.wzz.venom.common.BaseEntity; // 假设您有类似的基类
+import com.wzz.venom.enums.ProductIncomeStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -65,6 +67,30 @@ public class UserProduct extends BaseEntity { // 建议继承统一的BaseEntity
     @ColumnComment("状态（0-持有中，1-已结束）")
     @TableField("status")
     private Integer status;
+
+
+    /**
+     * 周期类型（秒）cycle_type
+     */
+    @TableField("cycle_type")
+    @ColumnComment("周期类型（秒）s")
+    @DefaultValue("'s'")
+    private String cycleType;
+
+    /**
+     * 产品周期（秒）数值 cycle_value
+     */
+    @TableField("cycle_value")
+    @ColumnComment("产品周期（秒）数值")
+    private String cycleValue;
+    /**
+     * 收益状态 （盈利 PROFIT 和 亏损 LOSS）
+     */
+    @TableField("income_status")
+    @ColumnComment("状态 盈利 PROFIT 和 亏损 LOSS")
+    @DefaultValue("'LOSS'")
+    private ProductIncomeStatusEnum incomeStatus;
+
 
     /** 状态哈希（数据防篡改校验） */
     @ColumnComment("状态哈希（数据防篡改校验）")

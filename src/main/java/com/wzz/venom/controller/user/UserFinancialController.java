@@ -1,12 +1,17 @@
 package com.wzz.venom.controller.user;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.wzz.venom.common.Result;
+import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.domain.entity.UserFinancial;
+import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.service.user.UserFinancialService;
+import com.wzz.venom.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 用户理财接口控制器
@@ -19,6 +24,9 @@ public class UserFinancialController {
     @Autowired
     private UserFinancialService userFinancialService;
 
+    @Autowired
+    private UserService userService;
+
     /**
      * 用户转入理财
      * @param amount 转入金额
@@ -26,13 +34,19 @@ public class UserFinancialController {
      */
     @PostMapping("/transferIn")
     public Result<?> userTransfersToFinancialManagement(@RequestParam Double amount) {
-        // 注意：在真实项目中，用户名应该从安全框架（如Spring Security）的上下文中获取
-        // String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
-        // 此处为演示，硬编码一个用户名
-        String currentUser = "testUser001";
+        try {
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User u =  userService.queryUserByUserId(userId);
+            if (u==null){
+                return Result.error("无法查询该用户！");
+            }
+            boolean success = userFinancialService.increaseUserFinancialBalance(u.getUserName(), amount);
+            return success ? Result.success("转入成功") : Result.error("转入失败，请稍后重试");
+        }catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        }
 
-        boolean success = userFinancialService.increaseUserFinancialBalance(currentUser, amount);
-        return success ? Result.success("转入成功") : Result.error("转入失败，请稍后重试");
     }
 
     /**
@@ -42,11 +56,20 @@ public class UserFinancialController {
      */
     @PostMapping("/transferOut")
     public Result<?> userTransfersOutFinancialManagement(@RequestParam Double amount) {
-        // 同样，从安全上下文中获取当前用户
-        String currentUser = "testUser001";
 
-        boolean success = userFinancialService.reduceUserFinancialBalance(currentUser, amount);
-        return success ? Result.success("转出成功") : Result.error("转出失败，可能余额不足");
+        try {
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User u =  userService.queryUserByUserId(userId);
+            if (u==null){
+                return Result.error("无法查询该用户！");
+            }
+            boolean success = userFinancialService.reduceUserFinancialBalance(u.getUserName(), amount);
+            return success ? Result.success("转出成功") : Result.error("转出失败，可能余额不足");
+        }catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        }
+
     }
 
     /**
@@ -55,11 +78,14 @@ public class UserFinancialController {
      * @return 理财信息列表
      */
     @GetMapping("/incomeList")
-    public Result<List<UserFinancial>> userObtainsFinancialIncomeList() {
-        // 同样，从安全上下文中获取当前用户
-        String currentUser = "testUser001";
-
-        List<UserFinancial> list = userFinancialService.queryTheDesignatedUserSFinancialInformation(currentUser);
-        return Result.success(list);
+    public Result<?> userObtainsFinancialIncomeList(@RequestParam String user) {
+        try{
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            List<UserFinancial> list = userFinancialService.queryTheDesignatedUserSFinancialInformationByuserId(userId,"text");
+            return Result.success("查询成功！",list);
+        }catch (BusinessException e){
+            return Result.error(e.getMessage());
+        }
     }
 }

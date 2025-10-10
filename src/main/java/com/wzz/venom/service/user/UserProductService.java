@@ -1,11 +1,12 @@
 package com.wzz.venom.service.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.wzz.venom.domain.entity.UserProduct;
 
 import java.util.List;
 
-public interface UserProductService {
+public interface UserProductService extends IService<UserProduct> {
     /**
      * 查询全部用户产品
      * @return 产品列表

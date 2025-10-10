@@ -98,4 +98,6 @@ public interface UserService {
     boolean changeUserWithdrawalPassword(String userName, String withdrawalPassword);
 
     User selectByUserName(UserDTO userDTO);
+
+    User queryUserByUserId(Long id);
 }

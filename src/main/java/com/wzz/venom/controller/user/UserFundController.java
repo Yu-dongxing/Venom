@@ -1,8 +1,12 @@
 package com.wzz.venom.controller.user;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.wzz.venom.common.Result; // 假设这是您的统一返回结果类
+import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.domain.entity.UserFundFlow;
+import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.service.user.UserFundFlowService;
+import com.wzz.venom.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +25,9 @@ public class UserFundController {
     @Autowired
     private UserFundFlowService userFundFlowService;
 
+    @Autowired
+    private UserService userService;
+
     /**
      * 用户提交充值申请
      * @param amount 充值金额
@@ -28,19 +35,20 @@ public class UserFundController {
      */
     @PostMapping("/recharge")
     public Result<?> userSubmitsRechargeRequest(@RequestParam Double amount) {
-        // 在实际应用中，用户名应从安全上下文（如Token）中获取，而不是参数传递
-        // String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
-        String currentUser = "testUser"; // 此处为模拟用户
-
         if (amount <= 0) {
             return Result.error("充值金额必须大于0");
         }
         try {
-            boolean success = userFundFlowService.increaseUserTransactionAmount(currentUser, amount, "用户在线充值");
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User u =  userService.queryUserByUserId(userId);
+            if (u==null){
+                return Result.error("无法查询该用户！");
+            }
+            boolean success = userFundFlowService.increaseUserTransactionAmount(u.getUserName(), amount, "用户在线充值");
             return success ? Result.success("充值成功") : Result.error("充值失败，请稍后重试");
-        } catch (Exception e) {
-            // 日志记录 e.getMessage()
-            return Result.error("充值操作异常，请联系客服");
+        }catch (BusinessException e) {
+            return Result.error(e.getMessage());
         }
     }
 
@@ -55,23 +63,21 @@ public class UserFundController {
      */
     @PostMapping("/withdraw")
     public Result<?> userSubmitsWithdrawalRequest(@RequestParam Double amount) {
-        // 同样，用户名应从安全上下文中获取
-        String currentUser = "testUser"; // 模拟用户
-
         if (amount <= 0) {
             return Result.error("提现金额必须大于0");
         }
 
         try {
-            // 业务说明：此处调用会直接生成一条支出成功的流水。
-            // 如果需要“申请-审核”流程，Service层应提供专门的接口来创建“处理中”状态的流水。
-            boolean success = userFundFlowService.reduceUserTransactionAmount(currentUser, amount, "用户申请提现");
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User u =  userService.queryUserByUserId(userId);
+            if (u==null){
+                return Result.error("无法查询该用户！");
+            }
+            boolean success = userFundFlowService.reduceUserTransactionAmountWITHDRA(u.getUserName(), amount, "用户申请提现");
             return success ? Result.success("提现申请已提交") : Result.error("提现申请失败");
-        } catch (RuntimeException e) {
-            // 捕获Service层抛出的“余额不足”等运行时异常
+        }catch (BusinessException e) {
             return Result.error(e.getMessage());
-        } catch (Exception e) {
-            return Result.error("系统异常，请稍后重试");
         }
     }
 
@@ -82,7 +88,6 @@ public class UserFundController {
      */
     @GetMapping("/flow")
     public Result<List<UserFundFlow>> userFundFlow(@RequestParam String user) {
-        // 安全注意：应校验当前登录用户是否有权限查看`user`的流水（例如，用户只能看自己的，或管理员才能看所有人的）
         List<UserFundFlow> flowList = userFundFlowService.queryTheUserSFundFlowList(user);
         return Result.success(flowList);
     }

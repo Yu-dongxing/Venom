@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wzz.venom.domain.entity.UserProduct;
 import com.wzz.venom.mapper.UserProductMapper;
+import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -50,15 +51,26 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
         return userProductMapper.updateById(product) > 0;
     }
 
+    // 新增：注入用户资金流水服务
+    @Autowired
+    private UserFundFlowService userFundFlowService;
+
     /**
-     * 添加用户产品
+     * 添加用户产品 (已重构，增加扣款逻辑)
      * @param product 产品对象
      * @return 是否成功
      */
     @Override
-    @Transactional
+    // 确保整个方法在一个事务中执行。如果任何步骤失败（包括资金扣除），所有数据库操作都将回滚。
+    @Transactional(rollbackFor = Exception.class)
     public boolean addUserProducts(UserProduct product) {
-        // insert方法返回影响的行数
+        // 步骤1：扣除用户账户资金
+        String description = String.format("购买理财产品：%s", product.getProductName());
+        userFundFlowService.reduceUserTransactionAmount(
+                product.getUserName(),
+                product.getAmount(), // DTO传递过来的amount是Double类型
+                description
+        );
         return userProductMapper.insert(product) > 0;
     }
 
@@ -71,7 +83,6 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     public List<UserProduct> searchForProductsHeldByUsersBasedOnTheirOwnership(String userName) {
         // 使用QueryWrapper构造查询条件
         QueryWrapper<UserProduct> queryWrapper = new QueryWrapper<>();
-        // eq方法表示 "equal"，即 user_name = 'xxx'
         queryWrapper.eq("user_name", userName);
         return userProductMapper.selectList(queryWrapper);
     }
@@ -130,4 +141,5 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     public List<UserProduct> list(QueryWrapper<UserProduct> queryWrapper) {
         return userProductMapper.selectList(queryWrapper);
     }
+
 }

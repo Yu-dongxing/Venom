@@ -1,14 +1,14 @@
 package com.wzz.venom.service.impl.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.wzz.venom.domain.entity.UserFundFlow;
+import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.mapper.UserFundFlowMapper;
 import com.wzz.venom.service.user.UserFundFlowService;
+import com.wzz.venom.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,6 +24,9 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
 
     @Autowired
     private UserFundFlowMapper userFundFlowMapper;
+
+    @Autowired
+    private UserService userService;
 
     // --- 定义常量以避免魔术值 ---
     /** 资金类型：提现 */
@@ -42,9 +45,9 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
     /** 状态：失败 */
     private static final int STATUS_FAILED = 2;
     /** 状态：提现申请通过 */
-    private static final int WITHDRAW_STATUS_APPROVED = 2;
+    private static final int WITHDRAW_STATUS_APPROVED = 0;
     /** 状态：提现申请拒绝 */
-    private static final int WITHDRAW_STATUS_REJECTED = 3;
+    private static final int WITHDRAW_STATUS_REJECTED = 2;
 
 
     @Override
@@ -74,7 +77,7 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
     @Override
     public List<UserFundFlow> queryAllWithdrawalTransactionInformation() {
         QueryWrapper<UserFundFlow> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("fund_type", FUND_TYPE_WITHDRAW)
+        queryWrapper.between("fund_type", FUND_TYPE_WITHDRAW,FUND_TYPE_WITHDRAW_REFUND)
                 .orderByDesc("create_time");
         return userFundFlowMapper.selectList(queryWrapper);
     }
@@ -123,6 +126,14 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
         return addFlowRecord(user, transactionAmount, FUND_TYPE_EXPENSE, describe);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public boolean reduceUserTransactionAmountWITHDRA(String user, Double amount, String describe) {
+        // 减少金额，传入的 amount 为正数，内部处理为负
+        BigDecimal transactionAmount = BigDecimal.valueOf(amount).negate();
+        return addFlowRecord(user, transactionAmount, FUND_TYPE_WITHDRAW, describe);
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean refuseToWithdrawAndReturnBalance(String user, Double amount) {
@@ -161,7 +172,7 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
         // 4. 如果是支出，检查余额是否充足
         if (transactionAmount.compareTo(BigDecimal.ZERO) < 0 && newBalance.compareTo(BigDecimal.ZERO) < 0) {
             // 抛出异常，触发事务回滚
-            throw new RuntimeException("账户余额不足，操作失败！");
+            throw new BusinessException(0,"账户余额不足，操作失败！");
         }
 
         // 5. 构建新的资金流水实体
@@ -171,9 +182,62 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
         newFlow.setBalance(newBalance); // 操作后的最终余额
         newFlow.setFundType(fundType);
         newFlow.setDescription(description);
-        newFlow.setStatus(STATUS_SUCCESS); // 默认为成功状态
+
+        //如果资金类型为提现，那么状态设置为待处理
+        if (FUND_TYPE_WITHDRAW.equals(fundType)){
+            newFlow.setStatus(STATUS_PROCESSING);
+        }else if (FUND_TYPE_WITHDRAW_REFUND.equals(fundType)){
+            //如果资金类型为提现驳回，那么状态设置为失败
+            newFlow.setStatus(STATUS_FAILED);
+        }else {
+            newFlow.setStatus(STATUS_SUCCESS);
+        }
 
         // 6. 插入新的流水记录
         return userFundFlowMapper.insert(newFlow) > 0;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public boolean modifyWithdrawalStatusById(Long flowId, Integer status) {
+        // 1. 根据ID查询提现记录
+        UserFundFlow withdrawalFlow = userFundFlowMapper.selectById(flowId);
+
+        // 2. 校验记录是否存在且合法
+        if (withdrawalFlow == null) {
+            throw new BusinessException(0, "未找到ID为 " + flowId + " 的提现记录！");
+        }
+        if (!FUND_TYPE_WITHDRAW.equals(withdrawalFlow.getFundType())) {
+            throw new BusinessException(0, "该记录不是提现申请，无法操作！");
+        }
+        if (!Objects.equals(STATUS_PROCESSING, withdrawalFlow.getStatus())) {
+            throw new BusinessException(0, "该提现申请已被处理，请勿重复操作！");
+        }
+
+        // 3. 根据新状态进行处理
+        if (Objects.equals(WITHDRAW_STATUS_REJECTED, status)) {
+            // 拒绝提现：需要返还冻结的余额
+            // 提现金额是负数，返还时应使用其绝对值
+            BigDecimal returnAmount = withdrawalFlow.getAmount().abs();
+            String description = String.format("提现申请[ID:%d]被管理员拒绝，资金返还", flowId);
+
+            // 调用核心方法增加一条“提现拒绝返还”类型的正向流水
+            addFlowRecord(withdrawalFlow.getUserName(), returnAmount, FUND_TYPE_WITHDRAW_REFUND, description);
+
+            // 更新原提现记录的状态为“失败”
+            withdrawalFlow.setStatus(STATUS_FAILED);
+
+        } else if (Objects.equals(WITHDRAW_STATUS_APPROVED, status)) {
+            // 批准提现：仅更新状态为“成功”
+            // 资金在申请时已经从余额中扣除，此处仅做状态变更，代表线下打款已完成
+            withdrawalFlow.setStatus(STATUS_SUCCESS);
+
+        } else {
+            // 无效的状态值
+            throw new BusinessException(0, "提供了无效的目标状态值！");
+        }
+
+        // 4. 更新数据库中的原始提现记录
+        return userFundFlowMapper.updateById(withdrawalFlow) > 0;
     }
 }
