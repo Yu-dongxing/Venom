@@ -122,7 +122,7 @@ public class AdminWithdrawalController {
 
         try {
             // 3. 调用Service层方法
-            userFundFlowService.modifyWithdrawalStatusById(dto.getFlowId(), dto.getStatus());
+            userFundFlowService.modifyWithdrawalStatusById(dto.getId(), dto.getStatus());
 
             // 4. 封装成功响应
             String action = dto.getStatus() == STATUS_APPROVED ? "通过" : "拒绝";

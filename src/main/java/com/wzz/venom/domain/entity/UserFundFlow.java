@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.wzz.venom.annotation.ColumnComment;
 import com.wzz.venom.annotation.DefaultValue;
+import com.wzz.venom.annotation.ForeignKey;
 import com.wzz.venom.annotation.TableComment;
 import com.wzz.venom.common.BaseEntity; // 假设您有类似的基类
+import com.wzz.venom.enums.ForeignKeyAction;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -21,6 +23,14 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true) // 如果继承了BaseEntity，建议加上这个注解
 @TableName("user_fund_flow")
 @TableComment("用户资金流水表")
+@ForeignKey(
+ name = "fk_account_user_id",               // 约束名称
+        columns = {"user_id"},                     // 当前表的列
+         referenceEntity = User.class,              // 引用 User 实体
+         referencedColumns = {"id"},                // 引用 User 表的 id 列
+        onDelete = ForeignKeyAction.CASCADE,       // 当 User 被删除时，该用户的账户也一并删除
+        onUpdate = ForeignKeyAction.RESTRICT       // 不允许更新 User 的 ID
+)
 public class UserFundFlow extends BaseEntity { // 建议继承统一的BaseEntity
     /** 用户名 */
     @ColumnComment("用户名")

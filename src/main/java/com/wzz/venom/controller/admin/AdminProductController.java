@@ -101,4 +101,11 @@ public class AdminProductController {
         boolean isSuccess = userProductService.deleteUserProductsBasedOnTheirIdentificationNumbers(id);
         return isSuccess ? Result.success("产品删除成功") : Result.error("产品删除失败，请检查产品是否存在");
     }
+    /**
+     * 查询所有用户产品列表
+     */
+    @GetMapping("/find/all")
+    public Result<?> findAll(){
+        return Result.success("查询成功！",userProductService.list());
+    }
 }

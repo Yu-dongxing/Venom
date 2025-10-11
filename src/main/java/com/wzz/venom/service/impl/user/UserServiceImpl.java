@@ -181,6 +181,19 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * 更新用户余额
+     */
+    @Override
+    public Boolean updateByUserBalance(String userName, Double amount) {
+        User user = this.queryUser(userName);
+        if (user==null){
+            throw new BusinessException(0,"用户 {"+userName+"} 不存在");
+        }
+        user.setBalance(BigDecimal.valueOf(amount));
+        return userMapper.updateById(user)>0;
+    }
+
+    /**
      * 修改信用分
      * @param userName 用户名
      * @param creditScore 新信用分

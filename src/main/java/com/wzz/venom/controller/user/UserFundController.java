@@ -7,6 +7,7 @@ import com.wzz.venom.domain.entity.UserFundFlow;
 import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserService;
+import com.wzz.venom.service.webSocket.WebSocketNotifyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,9 @@ public class UserFundController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private WebSocketNotifyService webSocketNotifyService;
+
     /**
      * 用户提交充值申请
      * @param amount 充值金额
@@ -46,6 +50,9 @@ public class UserFundController {
                 return Result.error("无法查询该用户！");
             }
             boolean success = userFundFlowService.increaseUserTransactionAmount(u.getUserName(), amount, "用户在线充值");
+            if (success){
+                webSocketNotifyService.sendUserRechargeNotification(u.getUserName(),amount);
+            }
             return success ? Result.success("充值成功") : Result.error("充值失败，请稍后重试");
         }catch (BusinessException e) {
             return Result.error(e.getMessage());
@@ -75,6 +82,9 @@ public class UserFundController {
                 return Result.error("无法查询该用户！");
             }
             boolean success = userFundFlowService.reduceUserTransactionAmountWITHDRA(u.getUserName(), amount, "用户申请提现");
+            if (success){
+                webSocketNotifyService.sendUserWithdrawalNotification(u.getUserName(),amount);
+            }
             return success ? Result.success("提现申请已提交") : Result.error("提现申请失败");
         }catch (BusinessException e) {
             return Result.error(e.getMessage());

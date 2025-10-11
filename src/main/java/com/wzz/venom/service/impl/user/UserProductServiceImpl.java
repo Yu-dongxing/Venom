@@ -66,6 +66,7 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     public boolean addUserProducts(UserProduct product) {
         // 步骤1：扣除用户账户资金
         String description = String.format("购买理财产品：%s", product.getProductName());
+
         userFundFlowService.reduceUserTransactionAmount(
                 product.getUserName(),
                 product.getAmount(), // DTO传递过来的amount是Double类型

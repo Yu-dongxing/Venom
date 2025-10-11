@@ -7,6 +7,7 @@ import com.wzz.venom.domain.entity.UserFinancial;
 import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.mapper.UserFinancialMapper;
 import com.wzz.venom.service.user.UserFinancialService;
+import com.wzz.venom.service.user.UserFundFlowService; // 新增导入
 import com.wzz.venom.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,10 @@ public class UserFinancialServiceImpl implements UserFinancialService {
 
     @Autowired
     private UserService userService;
+
+    // --- 新增注入 UserFundFlowService ---
+    @Autowired
+    private UserFundFlowService userFundFlowService;
 
     /**
      * 新增用户理财信息
@@ -77,30 +82,56 @@ public class UserFinancialServiceImpl implements UserFinancialService {
         }
         return userFinancialMapper.selectList(queryWrapper);
     }
+
     /**
-     * 扣减用户理财余额
+     * 扣减用户理财余额 (逻辑已修改)
+     * 现在此方法会原子性地完成两件事：
+     * 1. 扣减理财账户余额。
+     * 2. 在用户资金流水中增加一笔等额的收入记录。
      *
      * @param user   用户名
      * @param amount 扣减金额
      * @return 是否成功
      */
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class) // 使用事务确保数据一致性
     public boolean reduceUserFinancialBalance(String user, Double amount) {
         // 1. 参数校验
         if (user == null || amount == null || amount <= 0) {
-            return false;
+            // 在实际项目中，更建议抛出异常而不是返回 false
+            throw new BusinessException(0, "无效的参数！");
         }
 
         BigDecimal deductionAmount = BigDecimal.valueOf(amount);
+
+        // 2. 使用 UpdateWrapper 原子性地扣减理财余额，并确保余额充足
         UpdateWrapper<UserFinancial> updateWrapper = new UpdateWrapper<>();
         updateWrapper
-                .eq("user", user)  // 定位到指定用户
+                .eq("user_name", user)  // **修正：字段名为 user_name**
                 .ge("amount", deductionAmount) // 关键：确保余额充足 (amount >= deductionAmount)
-                .setSql("amount = amount - " + deductionAmount.toPlainString()); // 执行扣减
+                .setSql("amount = amount - " + deductionAmount.toPlainString()); // 执行SQL扣减
+
         int affectedRows = userFinancialMapper.update(null, updateWrapper);
-        return affectedRows > 0;
+
+        // 3. 检查扣减是否成功
+        if (affectedRows <= 0) {
+            // 如果影响行数为0，说明余额不足，抛出异常，事务将回滚
+            throw new BusinessException(0, "理财账户余额不足，转出失败！");
+        }
+
+        // 4. 理财余额扣减成功后，为用户增加一条资金流水记录
+        String description = "理财资金转出至账户余额";
+        boolean flowAdded = userFundFlowService.increaseUserTransactionAmount(user, amount, description);
+
+        // 如果增加流水失败（例如，increaseUserTransactionAmount内部抛出异常），整个事务也会回滚
+        if (!flowAdded) {
+            throw new BusinessException(0, "创建资金流水失败，操作已回滚！");
+        }
+
+        // 5. 所有操作成功
+        return true;
     }
+
 
     /**
      * 查询指定用户的全部理财信息

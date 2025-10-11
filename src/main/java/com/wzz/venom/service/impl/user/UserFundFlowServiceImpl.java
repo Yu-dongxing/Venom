@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
 
@@ -129,6 +130,7 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public boolean reduceUserTransactionAmountWITHDRA(String user, Double amount, String describe) {
+
         // 减少金额，传入的 amount 为正数，内部处理为负
         BigDecimal transactionAmount = BigDecimal.valueOf(amount).negate();
         return addFlowRecord(user, transactionAmount, FUND_TYPE_WITHDRAW, describe);
@@ -137,6 +139,7 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean refuseToWithdrawAndReturnBalance(String user, Double amount) {
+
         // 返还余额，本质是增加一笔正向流水
         BigDecimal returnAmount = BigDecimal.valueOf(amount);
         return addFlowRecord(user, returnAmount, FUND_TYPE_WITHDRAW_REFUND, "提现拒绝，资金返还");
@@ -192,6 +195,11 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
         }else {
             newFlow.setStatus(STATUS_SUCCESS);
         }
+        boolean balanceSuccess = userService.updateByUserBalance(userName, newBalance.doubleValue());
+        if (!balanceSuccess) {
+            // 如果余额更新失败，直接抛出异常，事务会回滚
+            throw new BusinessException(0, "更新用户余额失败");
+        }
 
         // 6. 插入新的流水记录
         return userFundFlowMapper.insert(newFlow) > 0;
@@ -240,4 +248,5 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
         // 4. 更新数据库中的原始提现记录
         return userFundFlowMapper.updateById(withdrawalFlow) > 0;
     }
+
 }

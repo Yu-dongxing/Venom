@@ -11,7 +11,7 @@ import lombok.Data;
 public class UpdateWithdrawalStatusByIdDTO {
 
     @NotNull(message = "提现记录ID不能为空")
-    private Long flowId;
+    private Long Id;
 
     @NotNull(message = "目标状态码不能为空")
     private Integer status;

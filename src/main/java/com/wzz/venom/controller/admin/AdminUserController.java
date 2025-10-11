@@ -3,15 +3,19 @@ package com.wzz.venom.controller.admin;
 import cn.dev33.satoken.stp.StpUtil;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.dto.AdminUserDto;
+import com.wzz.venom.domain.dto.UserAmountDto;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.service.admin.AdminUserService;
+import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static java.lang.Double.parseDouble;
 
 /**
  * 管理后台 - 用户管理接口
@@ -24,6 +28,9 @@ public class AdminUserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private UserFundFlowService userFundFlowService;
 
     /**
      * 查询所有用户
@@ -83,49 +90,52 @@ public class AdminUserController {
     }
 
     /**
-     * 为用户充值
-     * @param userName 用户名
-     * @param amount 充值金额，必须为正数
+     * 为用户充值 (逻辑已优化, 接口已修改为接收 JSON)
+     * @param dto 包含用户名和金额的数据传输对象
      * @return 操作结果
      */
     @PostMapping("/recharge")
-    public Result<?> rechargeForUsers(@RequestParam("user") String userName, @RequestParam Double amount) {
-        if (amount <= 0) {
+    // 【修改点】: 使用 @RequestBody 和 DTO
+    public Result<?> rechargeForUsers(@RequestBody UserAmountDto dto) {
+        log.info("管理员调用充值接口：{}，{}", dto.getUser(), dto.getAmount());
+
+        // 参数校验
+        if (dto.getAmount() == null || dto.getAmount() <= 0) {
             return Result.error("充值金额必须为正数");
         }
+
         try {
-            boolean success = userService.modifyUserBalance(userName, amount);
+            boolean success =  userFundFlowService.increaseUserTransactionAmount(dto.getUser(), dto.getAmount(), "管理员后台充值");
             return success ? Result.success() : Result.error("充值失败");
         } catch (BusinessException e) {
-            log.error("为用户 {} 充值 {} 失败", userName, amount, e);
+            log.error("为用户 {} 充值 {} 失败", dto.getUser(), dto.getAmount(), e);
             return Result.error(e.getMessage());
         } catch (Exception e) {
-            log.error("为用户 {} 充值 {} 失败", userName, amount, e);
-            return Result.error(e.getMessage());
+            log.error("为用户 {} 充值 {} 失败", dto.getUser(), dto.getAmount(), e);
+            return Result.error("充值失败，发生未知错误");
         }
     }
 
     /**
-     * 扣减用户余额
-     * @param userName 用户名
-     * @param amount 扣减金额，必须为正数
+     * 扣减用户余额 (逻辑已优化, 接口已修改为接收 JSON)
+     * @param dto 包含用户名和金额的数据传输对象
      * @return 操作结果
      */
     @PostMapping("/reduceBalance")
-    public Result<?> reduceUserBalance(@RequestParam("user") String userName, @RequestParam Double amount) {
-        if (amount <= 0) {
+    // 【修改点】: 使用 @RequestBody 和 DTO
+    public Result<?> reduceUserBalance(@RequestBody UserAmountDto dto) {
+        if (dto.getAmount() == null || dto.getAmount() <= 0) {
             return Result.error("扣减金额必须为正数");
         }
         try {
-            // Service层的modifyUserBalance接受负数作为扣款，因此这里传入负值
-            boolean success = userService.modifyUserBalance(userName, -amount);
+            boolean success = userFundFlowService.reduceUserTransactionAmount(dto.getUser(), dto.getAmount(), "管理员后台扣款");
             return success ? Result.success() : Result.error("扣减余额失败");
         } catch (BusinessException e) {
-            log.error("扣减用户 {} 余额 {} 失败", userName, amount, e);
+            log.error("扣减用户 {} 余额 {} 失败", dto.getUser(), dto.getAmount(), e);
             return Result.error(e.getMessage());
         } catch (Exception e) {
-            log.error("扣减用户 {} 余额 {} 失败", userName, amount, e);
-            return Result.error(e.getMessage());
+            log.error("扣减用户 {} 余额 {} 失败", dto.getUser(), dto.getAmount(), e);
+            return Result.error("扣减余额失败，发生未知错误");
         }
     }
 

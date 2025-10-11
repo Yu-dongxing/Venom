@@ -65,6 +65,8 @@ public interface UserService {
      */
     boolean modifyUserBalance(String userName, Double amount);
 
+    Boolean updateByUserBalance(String userName, Double amount);
+
     /**
      * 修改信用分
      * @param userName 用户名
