@@ -56,13 +56,15 @@ public class UserFinancialController {
      */
     @PostMapping("/transferOut")
     public Result<?> userTransfersOutFinancialManagement(@RequestParam Double amount) {
-
         try {
             StpUtil.checkLogin();
             Long userId = StpUtil.getLoginIdAsLong();
             User u =  userService.queryUserByUserId(userId);
             if (u==null){
                 return Result.error("无法查询该用户！");
+            }
+            if (!u.getIfOut()){
+                return Result.error("该用户没有转出理财的权限");
             }
             boolean success = userFinancialService.reduceUserFinancialBalance(u.getUserName(), amount);
             return success ? Result.success("转出成功") : Result.error("转出失败，可能余额不足");

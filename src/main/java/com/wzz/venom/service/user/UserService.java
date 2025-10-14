@@ -106,4 +106,7 @@ public interface UserService {
     User selectByUserName(UserDTO userDTO);
 
     User queryUserByUserId(Long id);
+
+    @Transactional(rollbackFor = Exception.class)
+    boolean addBankCardForUser(Long userId, String bankCard);
 }

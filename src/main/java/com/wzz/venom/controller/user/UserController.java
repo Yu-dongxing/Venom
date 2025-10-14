@@ -88,7 +88,8 @@ public class UserController {
             User user = new User();
             user.setUserName(userDTO.getUserName());
             user.setPassword(userDTO.getPassword());
-            user.setBankCard(userDTO.getBankCard());
+            // 移除 setBankCard 逻辑，注册时不再需要银行卡号
+            // user.setBankCard(userDTO.getBankCard());
             user.setWithdrawalPassword(userDTO.getWithdrawalPassword());
             user.setCreditScore(userDTO.getCreditScore());
             boolean success = userService.addUserByCode(user,userDTO.getInvitationCode());
@@ -189,5 +190,29 @@ public class UserController {
             return Result.success("系统中没有配置公告", "暂无公告");
         }
         return Result.success("获取平台公告成功", announcementValue);
+    }
+    /**
+     * 【新增】用户首次绑定银行卡
+     * @param userDTO 包含 bankCard 的数据传输对象
+     * @return 通用响应结果
+     */
+    @PostMapping("/addBankCard")
+    public Result<?> addBankCard(@RequestBody UserDTO userDTO) {
+        try {
+            // 1. 确认用户已登录
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+
+            // 2. 调用业务层方法
+            boolean success = userService.addBankCardForUser(userId, userDTO.getBankCard());
+            return success ? Result.success("银行卡绑定成功") : Result.error("银行卡绑定失败");
+
+        } catch (BusinessException e) {
+            log.warn("绑定银行卡业务异常 for user {}: {}", StpUtil.getLoginId(), e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("绑定银行卡时发生未知错误 for user " + StpUtil.getLoginId(), e);
+            return Result.error("系统繁忙，请稍后再试");
+        }
     }
 }

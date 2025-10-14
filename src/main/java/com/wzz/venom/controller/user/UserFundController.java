@@ -9,6 +9,7 @@ import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserService;
 import com.wzz.venom.service.webSocket.WebSocketNotifyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -79,6 +80,9 @@ public class UserFundController {
             User u =  userService.queryUserByUserId(userId);
             if (u==null){
                 return Result.error("无法查询该用户！");
+            }
+            if (!StringUtils.hasText(u.getBankCard())) {
+                return Result.error("请先绑定银行卡后再申请提现");
             }
             boolean success = userFundFlowService.reduceUserTransactionAmountWITHDRA(u.getUserName(), amount, "用户申请提现");
             if (success){

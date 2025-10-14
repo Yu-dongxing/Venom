@@ -4,7 +4,6 @@ import cn.hutool.core.lang.Assert;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.wzz.venom.domain.dto.UserDTO;
-import com.wzz.venom.domain.entity.InvitationCode;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.enums.UserStatusEnum;
 import com.wzz.venom.exception.BusinessException;
@@ -15,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -342,5 +342,38 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(0,"查询不到该用户");
         }
         return s;
+    }
+    /**
+     * 为用户首次绑定银行卡
+     * @param userId   用户ID
+     * @param bankCard 银行卡号
+     * @return 是否成功
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public boolean addBankCardForUser(Long userId, String bankCard) {
+        // 1. 参数校验
+        if (!StringUtils.hasText(bankCard)) {
+            throw new BusinessException(0, "银行卡号不能为空");
+        }
+
+        // 2. 获取用户信息
+        User user = userMapper.selectById(userId);
+        if (Objects.isNull(user)) {
+            throw new BusinessException(0, "用户不存在");
+        }
+
+        // 3. 核心逻辑：检查用户是否已绑定银行卡
+        //    使用 StringUtils.hasText() 可以同时判断 null, "", " " 等情况
+        if (StringUtils.hasText(user.getBankCard())) {
+            throw new BusinessException(0, "您已绑定银行卡，不可重复操作");
+        }
+
+        // 4. 执行更新
+        LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(User::getId, userId)
+                .set(User::getBankCard, bankCard);
+
+        return userMapper.update(null, updateWrapper) > 0;
     }
 }

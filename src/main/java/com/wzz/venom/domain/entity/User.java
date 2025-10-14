@@ -58,6 +58,14 @@ public class User extends BaseEntity {
     @DefaultValue("0")
     private Integer creditScore;
 
+    /**
+     * 是否有理财转出的权限
+     */
+    @TableField("if_out")
+    @ColumnComment("是否有理财转出的权限")
+    @DefaultValue("0")
+    private Boolean ifOut;
+
 
     /** 账户状态（0-正常 1-冻结 2-注销） */
     @ColumnComment("账户状态（0-正常 1-冻结 2-注销）")

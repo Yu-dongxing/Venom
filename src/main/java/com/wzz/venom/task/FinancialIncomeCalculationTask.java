@@ -5,7 +5,7 @@ import com.wzz.venom.domain.entity.UserFinancialStatement;
 import com.wzz.venom.service.config.SysConfigService;
 import com.wzz.venom.service.user.UserFinancialService;
 import com.wzz.venom.service.user.UserFinancialStatementService;
-import com.wzz.venom.service.user.UserFundFlowService;
+// import com.wzz.venom.service.user.UserFundFlowService; // 不再需要，可以移除
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 每日理财收益定时计算任务
+ * 每日理财收益定时计算任务（收益复投模式）
  */
 @Component
 public class FinancialIncomeCalculationTask {
@@ -32,17 +32,17 @@ public class FinancialIncomeCalculationTask {
     /** 理财流水类型：3-收益派发 */
     private static final int TRANSACTION_TYPE_INCOME = 3;
 
-
     private final SysConfigService sysConfigService;
     private final UserFinancialService userFinancialService;
-    private final UserFundFlowService userFundFlowService;
+    // private final UserFundFlowService userFundFlowService; // 已修改逻辑，不再直接操作用户余额
     private final UserFinancialStatementService userFinancialStatementService;
 
     @Autowired
-    public FinancialIncomeCalculationTask(SysConfigService sysConfigService, UserFinancialService userFinancialService, UserFundFlowService userFundFlowService, UserFinancialStatementService userFinancialStatementService) {
+    public FinancialIncomeCalculationTask(SysConfigService sysConfigService,
+                                          UserFinancialService userFinancialService,
+                                          UserFinancialStatementService userFinancialStatementService) {
         this.sysConfigService = sysConfigService;
         this.userFinancialService = userFinancialService;
-        this.userFundFlowService = userFundFlowService;
         this.userFinancialStatementService = userFinancialStatementService;
     }
 
@@ -63,7 +63,6 @@ public class FinancialIncomeCalculationTask {
 
         BigDecimal dailyRate;
         try {
-            // 将配置值转换为BigDecimal，用于精确计算
             dailyRate = new BigDecimal(rateValue.toString());
         } catch (NumberFormatException e) {
             log.error("【每日理财收益计算任务】执行失败：理财收益率配置值 '{}' 不是有效的数字。", rateValue);
@@ -77,9 +76,9 @@ public class FinancialIncomeCalculationTask {
 
         log.info("【每日理财收益计算任务】获取到当日理财收益率: {}", dailyRate);
 
-        // 2. 查询所有持有理财金额的用户 (amount > 0)
+        // 2. 查询所有持有理财金额的用户
         List<UserFinancial> activeFinancials = userFinancialService.findAll().stream()
-                .filter(uf -> uf.getAmount() != null && uf.getAmount().compareTo(BigDecimal.ZERO) > 0 && uf.getStatus() == 0) // 确保金额大于0且状态为持有中
+                .filter(uf -> uf.getAmount() != null && uf.getAmount().compareTo(BigDecimal.ZERO) > 0 && uf.getStatus() == 0)
                 .collect(Collectors.toList());
 
         if (activeFinancials.isEmpty()) {
@@ -94,11 +93,9 @@ public class FinancialIncomeCalculationTask {
         int failCount = 0;
         for (UserFinancial userFinancial : activeFinancials) {
             try {
-                // 调用包含事务的方法处理单个用户
                 processUserIncome(userFinancial, dailyRate);
                 successCount++;
             } catch (Exception e) {
-                // 捕获异常，防止单个用户失败导致整个任务中断
                 log.error("【每日理财收益计算任务】为用户 '{}' 计算收益时发生错误: {}", userFinancial.getUserName(), e.getMessage(), e);
                 failCount++;
             }
@@ -107,21 +104,19 @@ public class FinancialIncomeCalculationTask {
         log.info("【每日理财收益计算任务】执行完毕。成功处理 {} 个用户，失败 {} 个。", successCount, failCount);
     }
 
-
     /**
-     * 处理单个用户的收益计算和入账，此方法包含事务
+     * 处理单个用户的收益计算和复投，此方法包含事务
      * @param userFinancial 用户的理财信息
      * @param dailyRate     当日收益率
      */
     @Transactional(rollbackFor = Exception.class)
     public void processUserIncome(UserFinancial userFinancial, BigDecimal dailyRate) {
         String userName = userFinancial.getUserName();
-        BigDecimal principal = userFinancial.getAmount(); // 理财本金
+        BigDecimal principal = userFinancial.getAmount();
 
-        // 4. 计算收益金额，结果保留两位小数，四舍五入
+        // 4. 计算收益金额
         BigDecimal earnings = principal.multiply(dailyRate).setScale(2, RoundingMode.HALF_UP);
 
-        // 如果计算出的收益小于等于0.00，则无需记录
         if (earnings.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("用户 '{}' 的理财本金 {} 过低，计算收益为 {}，跳过本次派发。", userName, principal, earnings);
             return;
@@ -129,20 +124,19 @@ public class FinancialIncomeCalculationTask {
 
         log.info("为用户 '{}' 计算理财收益：本金 {}, 收益率 {}, 收益 {}", userName, principal, dailyRate, earnings);
 
-        // 5. 将收益记录到用户资金流水（主账户余额）
-        // 注意：这里需要确保 UserFundFlowService 的方法接受 BigDecimal 或 Double
-        boolean fundFlowSuccess = userFundFlowService.increaseUserTransactionAmount(userName, earnings.doubleValue(), "每日理财收益");
-        if (!fundFlowSuccess) {
+        // 5. 【核心修改】将收益增加到用户的理财本金中，实现复利
+        boolean updateSuccess = userFinancialService.increaseUserFinancialBalance(userName, earnings.doubleValue());
+        if (!updateSuccess) {
             // 抛出异常，触发事务回滚
-            throw new RuntimeException("增加用户资金流水失败！");
+            throw new RuntimeException("更新用户理财本金失败！");
         }
 
-        // 6. 创建一条新的理财流水记录，用于对账
+        // 6. 创建一条新的理财流水记录，记录本次收益
         UserFinancialStatement statement = new UserFinancialStatement();
         statement.setUserName(userName);
-        statement.setFinancialId(userFinancial.getId()); // 关联理财主记录ID
-        statement.setTransactionType(TRANSACTION_TYPE_INCOME); // 类型：收益派发
-        statement.setAmount(earnings); // 金额：本次收益
+        statement.setFinancialId(userFinancial.getId());
+        statement.setTransactionType(TRANSACTION_TYPE_INCOME);
+        statement.setAmount(earnings);
 
         boolean statementSuccess = userFinancialStatementService.addUserFinancialStatements(statement);
         if (!statementSuccess) {
