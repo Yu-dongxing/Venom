@@ -3,6 +3,7 @@ package com.wzz.venom.service.user;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.wzz.venom.domain.dto.*;
 import com.wzz.venom.domain.entity.User;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -13,6 +14,9 @@ public interface UserService {
      * @return 是否成功
      */
     boolean addUser(User user);
+
+    @Transactional(rollbackFor = Exception.class)
+    boolean addUserByCode(User user, String code);
 
     /**
      * 更新用户信息

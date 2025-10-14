@@ -57,8 +57,8 @@ public class FinancialIncomeCalculationTask {
         // 1. 从系统配置中获取日收益率
         Object rateValue = sysConfigService.getConfigValueByNameAndKey(SYS_CONFIG_NAME, FINANCIAL_RATE_KEY);
         if (rateValue == null) {
-            log.error("【每日理财收益计算任务】执行失败：未在 sys_config 表中找到名为 '{}' 的配置项。", FINANCIAL_RATE_KEY);
-            return;
+            log.error("【每日理财收益计算任务】执行失败：未在 sys_config 表中找到名为 '{}' 的配置项。使用默认值 0.2", FINANCIAL_RATE_KEY);
+            rateValue = new BigDecimal("0.2");
         }
 
         BigDecimal dailyRate;

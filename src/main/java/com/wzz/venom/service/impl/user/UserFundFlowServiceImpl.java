@@ -6,6 +6,8 @@ import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.mapper.UserFundFlowMapper;
 import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ import java.util.Objects;
 @Service
 public class UserFundFlowServiceImpl implements UserFundFlowService {
 
+    private static final Logger log = LogManager.getLogger(UserFundFlowServiceImpl.class);
     @Autowired
     private UserFundFlowMapper userFundFlowMapper;
 
@@ -165,6 +168,7 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
                         .orderByDesc("id")
                         .last("limit 1")
         );
+
 
         // 2. 计算当前余额
         BigDecimal currentBalance = (lastFlow != null) ? lastFlow.getBalance() : BigDecimal.ZERO;

@@ -35,4 +35,9 @@ public class UserDTO {
     private Integer creditScore;
     /** 账户状态（0-正常 1-冻结 2-注销） */
     private Integer accountStatus;
+
+    /**
+     * 邀请码
+     */
+    private String invitationCode;
 }

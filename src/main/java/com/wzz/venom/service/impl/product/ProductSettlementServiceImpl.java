@@ -2,11 +2,13 @@ package com.wzz.venom.service.impl.product;
 
 import com.wzz.venom.domain.entity.UserProduct;
 import com.wzz.venom.enums.ProductIncomeStatusEnum;
+import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.service.product.ProductSettlementService;
 import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserProductService;
 import com.wzz.venom.service.webSocket.WebSocketNotifyService;
 import com.wzz.venom.utils.FinancialCalculatorUtils;
+import com.wzz.venom.utils.TaskQueueUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,19 +61,29 @@ public class ProductSettlementServiceImpl implements ProductSettlementService {
                 product.getId(), product.getUserName(), product.getAmount(),
                 product.getInterestRate(), product.getIncomeStatus(), finalAmount);
 
-        // 4. 将计算后的金额增加到用户资金流水
-        String description = String.format("产品 '%s' 到期结算回款", product.getProductName());
-        // 注意：increaseUserTransactionAmount接收的是Double，这里做转换
-        boolean flowAdded = userFundFlowService.increaseUserTransactionAmount(
-                product.getUserName(),
-                finalAmount.doubleValue(),
-                description
-        );
 
-        if (!flowAdded) {
-            // 如果流水增加失败，抛出异常，整个事务回滚
-            throw new RuntimeException("为用户 " + product.getUserName() + " 增加资金流水失败！");
-        }
+
+        // 提交一个任务到队列中，使用Lambda表达式
+        TaskQueueUtil.execute(() -> {
+            try {
+                String description = String.format("产品 '%s' 到期结算回款", product.getProductName());
+                // 注意：increaseUserTransactionAmount接收的是Double，这里做转换
+                boolean flowAdded = userFundFlowService.increaseUserTransactionAmount(
+                        product.getUserName(),
+                        finalAmount.doubleValue(),
+                        description
+                );
+                if (!flowAdded) {
+                    // 如果流水增加失败，抛出异常，整个事务回滚
+                    throw new RuntimeException("为用户 " + product.getUserName() + " 增加资金流水失败！");
+                }
+            } catch (BusinessException e) {
+                Thread.currentThread().interrupt();
+                log.error("任务被中断", e);
+            }
+        });
+
+
 
         // 5. 更新产品状态为 "已结束" (status=1)
         product.setStatus(1);

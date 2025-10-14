@@ -122,7 +122,6 @@ public class AdminUserController {
      * @return 操作结果
      */
     @PostMapping("/reduceBalance")
-    // 【修改点】: 使用 @RequestBody 和 DTO
     public Result<?> reduceUserBalance(@RequestBody UserAmountDto dto) {
         if (dto.getAmount() == null || dto.getAmount() <= 0) {
             return Result.error("扣减金额必须为正数");

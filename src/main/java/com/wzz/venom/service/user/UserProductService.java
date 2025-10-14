@@ -13,6 +13,8 @@ public interface UserProductService extends IService<UserProduct> {
      */
     List<UserProduct> findAllProducts();
 
+    List<UserProduct> findProductByStatus(Integer status);
+
     /**
      * 更新用户产品信息
      * @param product 产品对象

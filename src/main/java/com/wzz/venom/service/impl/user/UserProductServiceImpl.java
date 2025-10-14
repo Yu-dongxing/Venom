@@ -1,5 +1,6 @@
 package com.wzz.venom.service.impl.user;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wzz.venom.domain.entity.UserProduct;
@@ -34,8 +35,21 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
      */
     @Override
     public List<UserProduct> findAllProducts() {
+        LambdaQueryWrapper<UserProduct> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.orderByDesc(UserProduct::getUpdateTime);
         // 调用BaseMapper的selectList方法，传入null查询所有
-        return userProductMapper.selectList(null);
+        return userProductMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 根据状态查询产品列表
+     */
+    @Override
+    public List<UserProduct> findProductByStatus(Integer status) {
+        QueryWrapper<UserProduct> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("status", status);
+        queryWrapper.orderByDesc("update_time");
+        return userProductMapper.selectList(queryWrapper);
     }
 
     /**

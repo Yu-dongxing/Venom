@@ -46,8 +46,9 @@ public class UserProductController {
      */
     @PostMapping("/submitOrder")
     public Result<?> userSubmitsOrder(@RequestBody UserProductDTO productDTO) {
-        if (!StringUtils.hasText(productDTO.getUser()) || !StringUtils.hasText(productDTO.getProductName())) {
-            return Result.error("用户名和产品名称不能为空");
+        productDTO.setCycleType("s");
+        if (!StringUtils.hasText(productDTO.getProductName())) {
+            return Result.error("产品名称不能为空");
         }
         if (productDTO.getAmount() == null || productDTO.getAmount() <= 0) {
             return Result.error("投入金额必须大于0");
@@ -59,12 +60,12 @@ public class UserProductController {
             User user = userService.queryUserByUserId(userId);
 
             UserProduct newProduct = convertDtoToEntity(productDTO);
+            newProduct.setUserName(user.getUserName());
 
             // 调用已经整合了扣款和下单逻辑的服务方法
             boolean success = userProductService.addUserProducts(newProduct);
 
             if (success) {
-                // 修复：使用DTO中实际的购买金额，而不是硬编码的20D
                 webSocketNotifyService.sendUserPurchaseNotification(
                         user.getUserName(),
                         productDTO.getProductName(),
@@ -87,36 +88,42 @@ public class UserProductController {
     /**
      * 用户获取持有中的产品列表
      *
-     * @param user 用户名 (与DTO中的字段 'user' 对应)
      * @return Result<List<UserProduct>>
      */
     @GetMapping("/hold")
-    public Result<?> usersAcquireAndHoldProducts(@RequestParam String user) {
-        // 参数校验
-        if (!StringUtils.hasText(user)) {
-            return Result.error("用户名不能为空");
+    public Result<?> usersAcquireAndHoldProducts() {
+        try{
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User user = userService.queryUserByUserId(userId);
+            List<UserProduct> productList = userProductService.searchForProductsHeldByUsersBasedOnTheirOwnership(user.getUserName());
+            return Result.success(productList);
         }
-        // 调用Service层查询
-        List<UserProduct> productList = userProductService.searchForProductsHeldByUsersBasedOnTheirOwnership(user);
-        // 返回成功结果
-        return Result.success(productList);
+        catch (BusinessException e){
+            return Result.error(e.getMessage());
+        }
     }
 
     /**
      * 用户获取所有已结束的交易记录
      *
-     * @param user 用户名
      * @return Result<List<UserProduct>>
      */
     @GetMapping("/records")
-    public Result<List<UserProduct>> userObtainsProductRecords(@RequestParam String user) {
-        // 参数校验
-        if (!StringUtils.hasText(user)) {
-            return Result.error("用户名不能为空");
+    public Result<List<UserProduct>> userObtainsProductRecords() {
+        try{
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User user = userService.queryUserByUserId(userId);
+            // 调用Service层查询
+            List<UserProduct> productList = userProductService.searchForEndOfUserTransactionProductsBasedOnUserSearch(user.getUserName());
+            return Result.success(productList);
         }
-        // 调用Service层查询
-        List<UserProduct> productList = userProductService.searchForEndOfUserTransactionProductsBasedOnUserSearch(user);
-        return Result.success(productList);
+        catch (BusinessException e){
+            return Result.error(e.getMessage());
+        }
+
+
     }
 
     /**
@@ -137,6 +144,7 @@ public class UserProductController {
         entity.setCycleType(dto.getCycleType());   // 映射周期类型
         entity.setCycleValue(dto.getCycleValue()); // 映射周期值
         entity.setIncomeStatus(dto.getIncomeStatus()); // 映射收益状态
+        entity.setValue(dto.isValue()); //
         try {
             Duration duration = calculateDuration(dto.getCycleType(), dto.getCycleValue());
             entity.setEndTime(LocalDateTime.now().plus(duration));

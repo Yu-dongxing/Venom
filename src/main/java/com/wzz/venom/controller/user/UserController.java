@@ -5,9 +5,11 @@ import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.dto.UserDTO;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.exception.BusinessException;
+import com.wzz.venom.service.config.SysConfigService;
 import com.wzz.venom.service.user.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -22,6 +24,11 @@ import java.util.Objects;
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
+
+
+    private static final String CONFIG_NAME_SYS = "sys_config";
+    private static final String CONFIG_KEY_FINANCIAL = "financial_management";
+    private static final String CONFIG_KEY_ANNOUNCEMENT = "platform_announcement";
 
     @Autowired
     private UserService userService;
@@ -74,18 +81,17 @@ public class UserController {
      */
     @PostMapping("/register")
     public Result<?> userRegistration(@RequestBody UserDTO userDTO) {
+        if(userDTO.getInvitationCode()==null){
+            return Result.error("邀请码不能为空！");
+        }
         try {
-            // 1. 将 DTO 转换为 Entity
             User user = new User();
             user.setUserName(userDTO.getUserName());
-            user.setPassword(userDTO.getPassword()); // 注意：实际生产中密码应加密存储
+            user.setPassword(userDTO.getPassword());
             user.setBankCard(userDTO.getBankCard());
             user.setWithdrawalPassword(userDTO.getWithdrawalPassword());
             user.setCreditScore(userDTO.getCreditScore());
-            // 其他字段（如余额、信用分、状态）在 service 的 addUser 方法中设置了默认值
-
-            // 2. 调用服务层进行注册
-            boolean success = userService.addUser(user);
+            boolean success = userService.addUserByCode(user,userDTO.getInvitationCode());
 
             return success ? Result.success("注册成功") : Result.error("注册失败，请重试");
         } catch (BusinessException e) {
@@ -108,17 +114,25 @@ public class UserController {
             // 1. 确认用户已登录，否则 Sa-Token 会抛出异常
             StpUtil.checkLogin();
 
-            Long userId  = StpUtil.getLoginIdAsLong();
+            Long userId = StpUtil.getLoginIdAsLong();
             User user = userService.queryUserByUserId(userId);
             if (Objects.isNull(user)) {
                 return Result.error(404, "无法获取用户信息，请重新登录");
             }
-            boolean success = userService.changeUserPassword(user.getUserName(), userDTO.getPassword());
 
-            return success ? Result.success("密码修改成功") : Result.error("密码修改失败");
+            if (!Objects.isNull(userDTO.getPassword())) {
+                boolean success = userService.changeUserPassword(user.getUserName(), userDTO.getPassword());
+                return success ? Result.success("密码修改成功") : Result.error("密码修改失败");
+            } else if (!Objects.isNull(userDTO.getWithdrawalPassword())) {
+                boolean success = userService.changeUserWithdrawalPassword(user.getUserName(), userDTO.getWithdrawalPassword());
+                return success ? Result.success("提现密码修改成功") : Result.error("提现密码修改失败");
+            }else {
+                return Result.error("输入参数不正确");
+            }
+
         } catch (BusinessException e) {
             log.warn("修改密码业务异常 for user {}: {}", StpUtil.getLoginId(), e.getMessage());
-            return Result.error( e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("修改密码时发生未知错误 for user " + StpUtil.getLoginId(), e);
             return Result.error("修改密码时发生未知错误");
@@ -147,5 +161,33 @@ public class UserController {
             log.error("获取用户详情时发生未知错误 for user " + StpUtil.getLoginId(), e);
             return Result.error("获取用户详情时发生未知错误");
         }
+    }
+    @Autowired
+    private SysConfigService sysConfigService;
+    /**
+     * 获取理财的利率
+     */
+    @GetMapping("/financial")
+    public Result<?> getFin(){
+        Object rateValue = sysConfigService.getConfigValueByNameAndKey("sys_config", "financial_management");
+        if (rateValue==null){
+            return Result.success("系统中没有配置","0.2");
+        }
+        return Result.success("获取系统配置", rateValue);
+    }
+
+    /**
+     *获取公告
+     */
+    /**
+     * 【新增】查询平台公告
+     */
+    @GetMapping("/announcement")
+    public Result<?> getAnnouncement() {
+        Object announcementValue = sysConfigService.getConfigValueByNameAndKey(CONFIG_NAME_SYS, CONFIG_KEY_ANNOUNCEMENT);
+        if (announcementValue == null || !StringUtils.hasText(announcementValue.toString())) {
+            return Result.success("系统中没有配置公告", "暂无公告");
+        }
+        return Result.success("获取平台公告成功", announcementValue);
     }
 }

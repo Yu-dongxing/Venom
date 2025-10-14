@@ -159,13 +159,15 @@ public class UserFinancialServiceImpl implements UserFinancialService {
         return userFinancialMapper.delete(queryWrapper) > 0;
     }
 
+
     /**
-     * 增加用户理财余额
+     * 增加用户理财余额 (转入理财)
      * <p>
-     * 修改后的逻辑：
-     * 1. 查询用户的理财记录。
-     * 2. 如果记录不存在，则为该用户创建一条新的理财记录。
-     * 3. 如果记录已存在，则在原有金额上增加指定数额。
+     * 修改后的逻辑 (原子操作):
+     * 1. 从用户主账户余额中扣除相应金额，并生成一条支出流水。
+     * 2. 如果扣款成功，则查询用户的理财记录。
+     * 3. 如果理财记录不存在，则为该用户创建一条新的理财记录。
+     * 4. 如果理财记录已存在，则在原有金额上增加指定数额。
      * </p>
      *
      * @param user   用户名
@@ -173,20 +175,30 @@ public class UserFinancialServiceImpl implements UserFinancialService {
      * @return 是否成功
      */
     @Override
-    @Transactional // 事务注解，确保查询和后续操作的原子性
+    @Transactional(rollbackFor = Exception.class) // 确保任何异常都会回滚整个事务
     public boolean increaseUserFinancialBalance(String user, Double amount) {
         // 1. 参数校验
         if (user == null || amount == null || amount <= 0) {
-            return false;
+            throw new BusinessException(0, "无效的转入金额！");
         }
+
+        // 2.【关键步骤】从用户主账户扣款，并生成资金流水
+        // 如果余额不足，reduceUserTransactionAmount 方法会抛出异常，此事务将自动回滚
+        String description = "资金转入理财账户";
+        userFundFlowService.reduceUserTransactionAmount(user, amount, description);
+
+        // 3. 主账户扣款成功后，为用户的理财账户增加余额
         List<UserFinancial> financials = queryTheDesignatedUserSFinancialInformation(user);
         BigDecimal increaseAmount = BigDecimal.valueOf(amount);
+
         if (CollectionUtils.isEmpty(financials)) {
+            // 如果用户没有理财账户，创建一个新的
             UserFinancial newUserFinancial = new UserFinancial();
             newUserFinancial.setUserName(user);
             newUserFinancial.setAmount(increaseAmount);
             return userFinancialMapper.insert(newUserFinancial) > 0;
         } else {
+            // 如果已有理财账户，直接增加金额
             UserFinancial userFinancial = financials.get(0);
             BigDecimal newAmount = userFinancial.getAmount().add(increaseAmount);
 
@@ -220,6 +232,7 @@ public class UserFinancialServiceImpl implements UserFinancialService {
         return userFinancialMapper.deleteById(id) > 0;
     }
 
+    //todo 返回字段 计算总共收益以及昨日收益/所有列表
     @Override
     public List<UserFinancial> queryTheDesignatedUserSFinancialInformationByuserId(Long userId, String currentUser) {
         User s = userService.queryUserByUserId(userId);

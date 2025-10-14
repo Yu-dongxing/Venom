@@ -78,7 +78,7 @@ public class UserFinancialController {
      * @return 理财信息列表
      */
     @GetMapping("/incomeList")
-    public Result<?> userObtainsFinancialIncomeList(@RequestParam String user) {
+    public Result<?> userObtainsFinancialIncomeList() {
         try{
             StpUtil.checkLogin();
             Long userId = StpUtil.getLoginIdAsLong();

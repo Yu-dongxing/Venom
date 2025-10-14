@@ -91,6 +91,13 @@ public class UserProduct extends BaseEntity { // 建议继承统一的BaseEntity
     @DefaultValue("'LOSS'")
     private ProductIncomeStatusEnum incomeStatus;
 
+    /**
+     * 数据检验值
+     */
+    @TableField("value")
+    @ColumnComment("数据检验值")
+    private Boolean value;
+
 
     /** 状态哈希（数据防篡改校验） */
     @ColumnComment("状态哈希（数据防篡改校验）")

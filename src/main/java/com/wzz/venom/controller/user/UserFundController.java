@@ -73,7 +73,6 @@ public class UserFundController {
         if (amount <= 0) {
             return Result.error("提现金额必须大于0");
         }
-
         try {
             StpUtil.checkLogin();
             Long userId = StpUtil.getLoginIdAsLong();

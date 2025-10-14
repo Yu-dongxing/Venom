@@ -24,6 +24,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(adminWebSocketController, "/ws/admin/notify")
+
                 // 允许所有域的连接，在生产环境中建议配置为具体的域名
                 .setAllowedOrigins("*");
     }

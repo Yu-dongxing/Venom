@@ -106,6 +106,13 @@ public class AdminProductController {
      */
     @GetMapping("/find/all")
     public Result<?> findAll(){
-        return Result.success("查询成功！",userProductService.list());
+        return Result.success("查询成功！",userProductService.findAllProducts());
+    }
+    /**
+     * 根据状态查询商品列表
+     */
+    @GetMapping("/find/status/{status}")
+    public Result<?> findAllBystatus (@PathVariable Integer status){
+        return Result.success(userProductService.findProductByStatus(status));
     }
 }

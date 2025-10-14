@@ -4,10 +4,12 @@ import cn.hutool.core.lang.Assert;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.wzz.venom.domain.dto.UserDTO;
+import com.wzz.venom.domain.entity.InvitationCode;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.enums.UserStatusEnum;
 import com.wzz.venom.exception.BusinessException;
 import com.wzz.venom.mapper.UserMapper;
+import com.wzz.venom.service.InvitationCode.InvitationCodeService;
 import com.wzz.venom.service.user.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private InvitationCodeService invitationCodeService;
 
     /**
      * 新增用户
@@ -42,6 +47,35 @@ public class UserServiceImpl implements UserService {
         user.setCreditScore(100); // 默认信用分
         return userMapper.insert(user) > 0;
     }
+
+    /**
+     * 新增用户（使用邀请码）
+     * @param user 用户实体
+     * @param code 邀请码
+     * @return 是否成功
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public boolean addUserByCode(User user, String code) {
+        if (Objects.nonNull(this.queryUser(user.getUserName()))) {
+            throw new BusinessException(0, "用户名 '" + user.getUserName() + "' 已存在");
+        }
+        user.setBalance(BigDecimal.ZERO); // 使用常量，更专业
+        user.setCreditScore(100);         // 默认信用分
+        boolean isUserInserted = userMapper.insert(user) > 0;
+        if (!isUserInserted) {
+            log.error("用户'{}'数据插入数据库失败", user.getUserName());
+            return false;
+        }
+        try {
+            invitationCodeService.useCode(code, user.getId());
+        } catch (RuntimeException e) {
+            throw new BusinessException(0, "邀请码使用失败: " + e.getMessage());
+        }
+        return true;
+    }
+
+
 
     /**
      * 更新用户信息

@@ -44,4 +44,9 @@ public class UserProductDTO {
      * 收益状态 （盈利 PROFIT 和 亏损 LOSS
      */
     private ProductIncomeStatusEnum incomeStatus;
+
+    /**
+     * 用户数据检验值
+     */
+    private boolean value;
 }
