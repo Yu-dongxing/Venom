@@ -1,6 +1,7 @@
 package com.wzz.venom.service.impl.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.wzz.venom.domain.dto.UserIncomeStatsDto;
 import com.wzz.venom.domain.entity.UserFinancialStatement;
 import com.wzz.venom.mapper.UserFinancialStatementMapper;
 import com.wzz.venom.service.user.UserFinancialStatementService;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -115,5 +118,71 @@ public class UserFinancialStatementServiceImpl implements UserFinancialStatement
         statement.setUserName(user);
         statement.setAmount(BigDecimal.valueOf(amount).negate());
         return userFinancialStatementMapper.insert(statement) > 0;
+    }
+
+    // 定义一个常量来表示“收益派发”的交易类型，避免使用魔法数字
+    private static final int TRANSACTION_TYPE_INCOME = 3;
+
+    @Override
+    public UserIncomeStatsDto getIncomeStatistics(String userName) {
+        // 1. 计算总收益
+        BigDecimal totalIncome = calculateTotalIncome(userName);
+
+        // 2. 计算昨日收益
+        BigDecimal yesterdayIncome = calculateYesterdayIncome(userName);
+
+        // 3. 查询所有收益记录列表
+        List<UserFinancialStatement> incomeRecords = queryIncomeRecords(userName);
+
+        // 4. 组装并返回结果
+        return new UserIncomeStatsDto(totalIncome, yesterdayIncome, incomeRecords);
+    }
+
+    /**
+     * 私有辅助方法：计算总收益
+     */
+    private BigDecimal calculateTotalIncome(String userName) {
+        QueryWrapper<UserFinancialStatement> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_name", userName)
+                .eq("transaction_type", TRANSACTION_TYPE_INCOME)
+                .select("SUM(amount) as totalAmount"); // 使用 SQL 的 SUM 函数
+
+        // selectObjs 返回一个 Object 列表，这里我们只需要第一个
+        List<Object> result = userFinancialStatementMapper.selectObjs(queryWrapper);
+        if (result != null && !result.isEmpty() && result.get(0) != null) {
+            return (BigDecimal) result.get(0);
+        }
+        return BigDecimal.ZERO; // 如果没有记录，则返回 0
+    }
+
+    /**
+     * 私有辅助方法：计算昨日收益
+     */
+    private BigDecimal calculateYesterdayIncome(String userName) {
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        QueryWrapper<UserFinancialStatement> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_name", userName)
+                .eq("transaction_type", TRANSACTION_TYPE_INCOME)
+                // 查询创建时间在昨天一整天范围内的数据
+                .between("create_time", yesterday.atStartOfDay(), yesterday.atTime(LocalTime.MAX))
+                .select("SUM(amount) as yesterdayAmount");
+
+        List<Object> result = userFinancialStatementMapper.selectObjs(queryWrapper);
+        if (result != null && !result.isEmpty() && result.get(0) != null) {
+            return (BigDecimal) result.get(0);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 私有辅助方法：查询所有收益记录
+     */
+    private List<UserFinancialStatement> queryIncomeRecords(String userName) {
+        QueryWrapper<UserFinancialStatement> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_name", userName)
+                .eq("transaction_type", TRANSACTION_TYPE_INCOME)
+                .orderByDesc("create_time"); // 按创建时间降序排列
+
+        return userFinancialStatementMapper.selectList(queryWrapper);
     }
 }

@@ -2,6 +2,7 @@ package com.wzz.venom.controller.user;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.wzz.venom.common.Result;
+import com.wzz.venom.domain.dto.UserIncomeStatsDto;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.domain.entity.UserFinancialStatement;
 import com.wzz.venom.exception.BusinessException;
@@ -38,6 +39,28 @@ public class UserFinancialFlowController {
             return Result.success("查询成功",ll);
         }catch (BusinessException e){
             return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 用户获取收益统计（总收益、昨日收益、收益列表）
+     */
+    @GetMapping("/income-stats")
+    public Result<?> userIncomeStatistics() {
+        try {
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User u = userService.queryUserByUserId(userId);
+            if (u == null) {
+                return Result.error("无法查询该用户！");
+            }
+            UserIncomeStatsDto statsDto = userFinancialStatementService.getIncomeStatistics(u.getUserName());
+
+            return Result.success("查询成功", statsDto);
+        } catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("系统繁忙，请稍后再试！");
         }
     }
 }

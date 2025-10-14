@@ -3,6 +3,7 @@ package com.wzz.venom.controller.admin;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.entity.UserFinancial;
 import com.wzz.venom.service.user.UserFinancialService;
+import com.wzz.venom.task.FinancialIncomeCalculationTask;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -68,5 +69,26 @@ public class AdminFinancialController {
     public Result<?> deleteDesignatedUserSFinancialInformation(@RequestParam Long id) {
         boolean success = userFinancialService.deleteFinancialInformationById(id);
         return success ? Result.success("删除成功") : Result.error("删除失败，记录可能不存在");
+    }
+    @Autowired
+    private FinancialIncomeCalculationTask financialIncomeCalculationTask;
+
+
+    /**
+     * 手动触发每日理财收益计算任务
+     * <p>
+     * 该接口用于管理员手动执行一次全用户的理财收益计算与派发。
+     * 调用此接口会立即执行计算收益方法。
+     * </p>
+     * @return 操作结果
+     */
+    @PostMapping("/trigger-daily-income-calculation")
+    public Result<?> manuallyTriggerDailyIncomeCalculation() {
+        try {
+            financialIncomeCalculationTask.calculateDailyFinancialIncome();
+            return Result.success("手动触发每日收益计算任务已成功执行。");
+        } catch (Exception e) {
+            return Result.error("任务执行失败，请查看服务器日志获取详细信息。错误: " + e.getMessage());
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.wzz.venom.service.user;
 
+import com.wzz.venom.domain.dto.UserIncomeStatsDto;
 import com.wzz.venom.domain.entity.UserFinancialStatement;
 
 import java.util.List;
@@ -48,4 +49,6 @@ public interface UserFinancialStatementService {
      * @return 是否成功
      */
     boolean reduceUserUnderstandingOfTransactionAmounts(String user, Double amount);
+
+    UserIncomeStatsDto getIncomeStatistics(String userName);
 }

@@ -98,4 +98,19 @@ public class AdminWebSocketController extends TextWebSocketHandler {
         message.put("amount", amount);
         sessionManager.broadcast(message);
     }
+
+    /**
+     * 通用方法：通知管理后台，有来自用户的实时事件
+     * @param userId 报告事件的用户ID
+     * @param eventType 事件类型 (例如: "USER_CONNECTED", "CONTACT_SUPPORT")
+     * @param data 事件相关数据 (可以为 null)
+     */
+    public void notifyAdminGenericUserEvent(Long userId, String eventType, Object data) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("event", "USER_EVENT_REPORT"); // 给管理端定义一个新的事件类型，用于接收所有用户上报
+        message.put("reportedByUserId", userId);
+        message.put("reportedEvent", eventType);
+        message.put("reportedData", data);
+        sessionManager.broadcast(message);
+    }
 }
