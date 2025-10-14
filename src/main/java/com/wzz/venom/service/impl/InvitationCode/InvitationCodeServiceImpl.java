@@ -101,6 +101,7 @@ public class InvitationCodeServiceImpl extends ServiceImpl<InvitationCodeMapper,
         // 这里可以设置继承自 BaseEntity 的 updateTime等字段
         invitationCode.setUpdateTime(LocalDateTime.now());
 
+        //删除该邀请码
         boolean success = this.updateById(invitationCode);
         if (!success) {
             // 极端并发情况下可能更新失败，可以抛出异常让事务回滚
