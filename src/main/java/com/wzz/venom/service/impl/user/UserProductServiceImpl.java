@@ -72,28 +72,33 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     @Autowired
     private UserFundFlowService userFundFlowService;
 
+
+    // 使用 @Lazy 注解避免循环依赖问题
     @Lazy
     @Autowired
     private ProductSchedulingService productSchedulingService;
+
     /**
-     * 添加用户产品 (已重构，增加扣款逻辑)
+     * 添加用户产品 (已重构，增加扣款和任务调度逻辑)
      * @param product 产品对象
      * @return 是否成功
      */
     @Override
-    // 确保整个方法在一个事务中执行。如果任何步骤失败（包括资金扣除），所有数据库操作都将回滚。
     @Transactional(rollbackFor = Exception.class)
     public boolean addUserProducts(UserProduct product) {
         // 步骤1：扣除用户账户资金
         String description = String.format("购买理财产品：%s", product.getProductName());
-        productSchedulingService.reschedulePendingTasksOnStartup();
         userFundFlowService.reduceUserTransactionAmount(
                 product.getUserName(),
-                product.getAmount(), // DTO传递过来的amount是Double类型
+                product.getAmount(),
                 description
         );
+        boolean success = userProductMapper.insert(product) > 0;
+        if (success) {
+            productSchedulingService.scheduleProductSettlement(product);
+        }
 
-        return userProductMapper.insert(product) > 0;
+        return success;
     }
 
     /**
