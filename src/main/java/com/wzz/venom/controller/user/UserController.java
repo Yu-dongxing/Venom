@@ -105,29 +105,31 @@ public class UserController {
     }
 
     /**
-     * 用户修改登录密码
-     * @param userDTO 包含新密码的数据传输对象
-     * @return 通用响应结果
+     * 用户修改登录密码或提现密码
+     * [已修改] 增加冻结检查
      */
     @PostMapping("/changePassword")
     public Result<?> userChangesLoginPassword(@RequestBody UserDTO userDTO) {
         try {
-            // 1. 确认用户已登录，否则 Sa-Token 会抛出异常
             StpUtil.checkLogin();
-
             Long userId = StpUtil.getLoginIdAsLong();
             User user = userService.queryUserByUserId(userId);
             if (Objects.isNull(user)) {
                 return Result.error(404, "无法获取用户信息，请重新登录");
             }
 
-            if (!Objects.isNull(userDTO.getPassword())) {
+            // [修改] 核心：在执行任何操作前，先检查冻结状态
+            if (Boolean.TRUE.equals(user.getIsFrozen())) {
+                return Result.error("账户已被冻结，无法修改密码");
+            }
+
+            if (StringUtils.hasText(userDTO.getPassword())) {
                 boolean success = userService.changeUserPassword(user.getUserName(), userDTO.getPassword());
                 return success ? Result.success("密码修改成功") : Result.error("密码修改失败");
-            } else if (!Objects.isNull(userDTO.getWithdrawalPassword())) {
+            } else if (StringUtils.hasText(userDTO.getWithdrawalPassword())) {
                 boolean success = userService.changeUserWithdrawalPassword(user.getUserName(), userDTO.getWithdrawalPassword());
                 return success ? Result.success("提现密码修改成功") : Result.error("提现密码修改失败");
-            }else {
+            } else {
                 return Result.error("输入参数不正确");
             }
 
@@ -137,6 +139,35 @@ public class UserController {
         } catch (Exception e) {
             log.error("修改密码时发生未知错误 for user " + StpUtil.getLoginId(), e);
             return Result.error("修改密码时发生未知错误");
+        }
+    }
+
+    /**
+     * 【新增】用户首次绑定姓名及银行详细信息
+     * @param userDTO 包含 realName, bankName, bankBranch 的数据传输对象
+     * @return 通用响应结果
+     */
+    @PostMapping("/addBankDetails")
+    public Result<?> addBankDetails(@RequestBody UserDTO userDTO) {
+        try {
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+
+            // 在 Controller 层直接调用 Service 层的新方法
+            boolean success = userService.addBankDetails(
+                    userId,
+                    userDTO.getRealName(),
+                    userDTO.getBankName(),
+                    userDTO.getBankBranch()
+            );
+            return success ? Result.success("银行信息绑定成功") : Result.error("银行信息绑定失败");
+
+        } catch (BusinessException e) {
+            log.warn("绑定银行信息业务异常 for user {}: {}", StpUtil.getLoginId(), e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("绑定银行信息时发生未知错误 for user " + StpUtil.getLoginId(), e);
+            return Result.error("系统繁忙，请稍后再试");
         }
     }
 

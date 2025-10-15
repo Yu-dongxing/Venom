@@ -1,5 +1,6 @@
 package com.wzz.venom.controller.admin;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.entity.UserFinancial;
 import com.wzz.venom.service.user.UserFinancialService;
@@ -29,6 +30,22 @@ public class AdminFinancialController {
     public Result<List<UserFinancial>> findAllUserFinancialManagementLists() {
         List<UserFinancial> list = userFinancialService.findAll();
         return Result.success(list);
+    }
+
+    /**
+     *分页查询所有用户理财记录
+     *
+     * @param current 当前页码, 默认为 1
+     * @param size    每页显示条数, 默认为 10
+     * @return 分页结果对象，包含了记录列表、总数、总页数等信息
+     */
+    @GetMapping("/page")
+    public Result<Page<UserFinancial>> findPage(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size) {
+        Page<UserFinancial> page = new Page<>(current, size);
+        Page<UserFinancial> pageResult = userFinancialService.findAllByPage(page);
+        return Result.success(pageResult);
     }
 
     /**

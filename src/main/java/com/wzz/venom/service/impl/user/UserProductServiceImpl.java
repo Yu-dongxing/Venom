@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wzz.venom.domain.entity.UserProduct;
 import com.wzz.venom.mapper.UserProductMapper;
+import com.wzz.venom.service.impl.product.ProductSchedulingServiceImpl;
+import com.wzz.venom.service.product.ProductSchedulingService;
 import com.wzz.venom.service.user.UserFundFlowService;
 import com.wzz.venom.service.user.UserProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional; // 建议对写操作添加事务管理
 
@@ -69,6 +72,9 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     @Autowired
     private UserFundFlowService userFundFlowService;
 
+    @Lazy
+    @Autowired
+    private ProductSchedulingService productSchedulingService;
     /**
      * 添加用户产品 (已重构，增加扣款逻辑)
      * @param product 产品对象
@@ -80,12 +86,13 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     public boolean addUserProducts(UserProduct product) {
         // 步骤1：扣除用户账户资金
         String description = String.format("购买理财产品：%s", product.getProductName());
-
+        productSchedulingService.reschedulePendingTasksOnStartup();
         userFundFlowService.reduceUserTransactionAmount(
                 product.getUserName(),
                 product.getAmount(), // DTO传递过来的amount是Double类型
                 description
         );
+
         return userProductMapper.insert(product) > 0;
     }
 

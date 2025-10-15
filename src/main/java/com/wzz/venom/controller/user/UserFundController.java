@@ -35,6 +35,7 @@ public class UserFundController {
 
     /**
      * 用户提交充值申请
+     * [重大修改] 此接口现在只创建一条"待审核"的记录，资金不会立即到账。
      * @param amount 充值金额
      * @return Result
      */
@@ -50,24 +51,70 @@ public class UserFundController {
             if (u==null){
                 return Result.error("无法查询该用户！");
             }
-            boolean success = userFundFlowService.increaseUserTransactionAmount(u.getUserName(), amount, "用户在线充值");
+            // 调用新的充值申请服务
+            boolean success = userFundFlowService.requestRecharge(u.getUserName(), amount, "用户在线充值申请");
             if (success){
+                // 通知管理员有新的充值请求
                 webSocketNotifyService.sendUserRechargeNotification(u.getUserName(),amount);
             }
-            return success ? Result.success("充值成功") : Result.error("充值失败，请稍后重试");
-        }catch (BusinessException e) {
+            return success ? Result.success("充值申请提交成功，等待管理员审核") : Result.error("充值申请失败，请稍后重试");
+        } catch (BusinessException e) {
             return Result.error(e.getMessage());
         }
     }
 
     /**
-     * 用户提交提现申请
-     * 注意：提现申请应该生成一条“处理中”的流水，而不是直接扣款。
-     * 因此，这里直接调用 `reduceUserTransactionAmount` 可能不完全符合业务。
-     * 一个更优的设计是在Service层提供一个 `requestWithdrawal` 方法。
-     * 此处我们遵循现有接口，假设 `reduceUserTransactionAmount` 用于此目的。
-     * @param amount 提现金额
+     * [新增] (管理员)查询待审核的充值列表
+     * @return Result<List<UserFundFlow>>
+     */
+    @GetMapping("/recharge/pending")
+    public Result<List<UserFundFlow>> getPendingRechargeRequests() {
+        // 安全注意：此接口应仅对管理员角色开放
+        // 例如: StpUtil.checkRole("admin");
+        List<UserFundFlow> records = userFundFlowService.getPendingRecharges();
+        return Result.success(records);
+    }
+
+    /**
+     * [新增] (管理员)通过充值申请
+     * @param flowId 资金流水ID
      * @return Result
+     */
+    @PostMapping("/recharge/approve")
+    public Result<?> approveRechargeRequest(@RequestParam Long flowId) {
+        if (flowId == null || flowId <= 0) {
+            return Result.error("无效的流水ID");
+        }
+        try {
+            boolean success = userFundFlowService.approveRecharge(flowId);
+            // 可以在此处添加通知用户的逻辑
+            return success ? Result.success("充值审核通过，操作成功") : Result.error("审核操作失败");
+        } catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * [新增] (管理员)拒绝充值申请
+     * @param flowId 资金流水ID
+     * @return Result
+     */
+    @PostMapping("/recharge/refuse")
+    public Result<?> refuseRechargeRequest(@RequestParam Long flowId) {
+        if (flowId == null || flowId <= 0) {
+            return Result.error("无效的流水ID");
+        }
+        try {
+            boolean success = userFundFlowService.refuseRecharge(flowId);
+            return success ? Result.success("充值审核拒绝，操作成功") : Result.error("拒绝审核操作失败");
+        } catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+
+    /**
+     * 用户提交提现申请
      */
     @PostMapping("/withdraw")
     public Result<?> userSubmitsWithdrawalRequest(@RequestParam Double amount) {
@@ -96,35 +143,37 @@ public class UserFundController {
 
     /**
      * 用户查看自己的资金流水
-     * @param user 用户名
-     * @return Result<List<UserFundFlow>>
      */
     @GetMapping("/flow")
-    public Result<List<UserFundFlow>> userFundFlow(@RequestParam String user) {
-        List<UserFundFlow> flowList = userFundFlowService.queryTheUserSFundFlowList(user);
-        return Result.success(flowList);
+    public Result<List<UserFundFlow>> userFundFlow() {
+        try{
+            StpUtil.checkLogin();
+            Long userId = StpUtil.getLoginIdAsLong();
+            User u =  userService.queryUserByUserId(userId);
+            if (u==null){
+                return Result.error("无法查询该用户！");
+            }
+            List<UserFundFlow> flowList = userFundFlowService.queryTheUserSFundFlowList(u.getUserName());
+            return Result.success(flowList);
+        }catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     /**
      * (管理员)查询所有提现交易信息
-     * @return Result<List<UserFundFlow>>
      */
     @GetMapping("/withdrawRecords")
     public Result<List<UserFundFlow>> queryAllWithdrawalTransactionInformation() {
-        // 安全注意：此接口应仅对管理员角色开放
         List<UserFundFlow> records = userFundFlowService.queryAllWithdrawalTransactionInformation();
         return Result.success(records);
     }
 
     /**
      * (管理员)修改提现状态
-     * @param user 用户名
-     * @param status 状态（1申请，2通过，3拒绝）
-     * @return Result
      */
     @PostMapping("/modifyWithdrawStatus")
     public Result<?> modifyUserWithdrawalStatus(@RequestParam String user, @RequestParam Integer status) {
-        // 安全注意：此接口应仅对管理员角色开放
         if (status == null || status < 1 || status > 3) {
             return Result.error("无效的状态码");
         }
@@ -134,16 +183,11 @@ public class UserFundController {
 
     /**
      * (管理员)增加用户交易金额
-     * @param user 用户名
-     * @param amount 金额
-     * @param describe 描述
-     * @return Result
      */
     @PostMapping("/increase")
     public Result<?> increaseUserTransactionAmount(@RequestParam String user,
                                                    @RequestParam Double amount,
                                                    @RequestParam String describe) {
-        // 安全注意：此接口应仅对管理员角色开放，用于后台调账、发放奖励等
         if (amount <= 0) {
             return Result.error("增加的金额必须大于0");
         }
@@ -153,16 +197,11 @@ public class UserFundController {
 
     /**
      * (管理员)减少用户交易金额
-     * @param user 用户名
-     * @param amount 金额
-     * @param describe 描述
-     * @return Result
      */
     @PostMapping("/reduce")
     public Result<?> reduceUserTransactionAmount(@RequestParam String user,
                                                  @RequestParam Double amount,
                                                  @RequestParam String describe) {
-        // 安全注意：此接口应仅对管理员角色开放，用于后台扣款等
         if (amount <= 0) {
             return Result.error("减少的金额必须大于0");
         }
@@ -176,16 +215,9 @@ public class UserFundController {
 
     /**
      * (管理员)拒绝提现并返还余额
-     * 注意：此功能已整合到 `modifyUserWithdrawalStatus` 接口中。
-     * 当 status=3 (拒绝) 时，Service层会自动返还余额。
-     * 此接口可作为补充或单独的补偿机制存在。
-     * @param user 用户名
-     * @param amount 金额
-     * @return Result
      */
     @PostMapping("/refuse")
     public Result<?> refuseToWithdrawAndReturnBalance(@RequestParam String user, @RequestParam Double amount) {
-        // 安全注意：此接口应仅对管理员角色开放
         if (amount <= 0) {
             return Result.error("返还的金额必须大于0");
         }

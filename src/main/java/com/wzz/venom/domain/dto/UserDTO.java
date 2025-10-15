@@ -40,4 +40,24 @@ public class UserDTO {
      * 邀请码
      */
     private String invitationCode;
+
+    /**
+     * 真实姓名
+     */
+    private String realName;
+
+    /**
+     * 银行名称 (例如：中国工商银行)
+     */
+    private String bankName;
+
+    /**
+     * 开户行 (例如：中国工商银行北京中关村支行)
+     */
+    private String bankBranch;
+
+    /**
+     * 是否冻结
+     */
+    private Boolean isFrozen;
 }

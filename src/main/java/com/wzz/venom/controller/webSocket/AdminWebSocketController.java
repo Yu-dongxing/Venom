@@ -1,5 +1,7 @@
 package com.wzz.venom.controller.webSocket;
 
+import com.wzz.venom.domain.entity.User;
+import com.wzz.venom.service.user.UserService;
 import com.wzz.venom.utils.WebSocketSessionManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,9 @@ import java.util.Map;
  */
 @Component
 public class AdminWebSocketController extends TextWebSocketHandler {
+
+    @Autowired
+    private UserService userService;
 
     private final WebSocketSessionManager sessionManager;
 
@@ -106,11 +111,19 @@ public class AdminWebSocketController extends TextWebSocketHandler {
      * @param data 事件相关数据 (可以为 null)
      */
     public void notifyAdminGenericUserEvent(Long userId, String eventType, Object data) {
+        User uu = userService.queryUserByUserId(userId);
+        String userNam = "";
+        if (uu==null){
+            userNam = "";
+        }else {
+            userNam = uu.getUserName();
+        }
+
         Map<String, Object> message = new HashMap<>();
-        message.put("event", "USER_EVENT_REPORT"); // 给管理端定义一个新的事件类型，用于接收所有用户上报
-        message.put("reportedByUserId", userId);
-        message.put("reportedEvent", eventType);
-        message.put("reportedData", data);
+        message.put("event", eventType); // 给管理端定义一个新的事件类型，用于接收所有用户上报
+        message.put("userId", userId);
+        message.put("data", data);
+        message.put("user",userNam);
         sessionManager.broadcast(message);
     }
 }

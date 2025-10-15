@@ -13,7 +13,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal; // 导入 BigDecimal 类
-import java.time.LocalDateTime;
 
 /**
  * 用户资金流水实体类（账本）
@@ -24,10 +23,10 @@ import java.time.LocalDateTime;
 @TableName("user_fund_flow")
 @TableComment("用户资金流水表")
 @ForeignKey(
- name = "fk_account_user_id",               // 约束名称
+        name = "fk_account_user_id",               // 约束名称
         columns = {"user_id"},                     // 当前表的列
-         referenceEntity = User.class,              // 引用 User 实体
-         referencedColumns = {"id"},                // 引用 User 表的 id 列
+        referenceEntity = User.class,              // 引用 User 实体
+        referencedColumns = {"id"},                // 引用 User 表的 id 列
         onDelete = ForeignKeyAction.CASCADE,       // 当 User 被删除时，该用户的账户也一并删除
         onUpdate = ForeignKeyAction.RESTRICT       // 不允许更新 User 的 ID
 )
@@ -75,4 +74,12 @@ public class UserFundFlow extends BaseEntity { // 建议继承统一的BaseEntit
     @ColumnComment("交易描述/备注")
     @TableField("description") // 数据库字段名使用 description
     private String description; // 字段名从 describe 修改为 description，避免关键字冲突
+
+    /**
+     * [新增] 是否生效（0-未生效/待审核, 1-已生效,2 -拒绝）。充值功能需要审核。
+     */
+    @ColumnComment("是否生效（0-未生效/待审核, 1-已生效 2 -拒绝）")
+    @TableField("is_effective")
+    @DefaultValue("1")
+    private Integer isEffective;
 }

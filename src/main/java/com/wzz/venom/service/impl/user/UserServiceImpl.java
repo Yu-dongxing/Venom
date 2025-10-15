@@ -275,9 +275,7 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 修改登录密码
-     * @param userName 用户名
-     * @param password 新密码
-     * @return 是否成功
+     * [已修改] 增加冻结检查
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -287,23 +285,19 @@ public class UserServiceImpl implements UserService {
         if (user==null){
             throw new BusinessException(0,"用户 {"+userName+"} 不存在");
         }
-//        Assert.notNull(user, "用户 '{}' 不存在", userName);
-
-        // 在实际项目中，密码必须经过加密处理
-        // String encodedPassword = passwordEncoder.encode(password);
+        // [修改] 增加冻结检查
+        checkUserFrozen(user);
 
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getUserName, userName)
-                .set(User::getPassword, password); // 实际应为 encodedPassword
+                .set(User::getPassword, password);
 
         return userMapper.update(null, updateWrapper) > 0;
     }
 
     /**
      * 修改提现密码
-     * @param userName 用户名
-     * @param withdrawalPassword 新提现密码
-     * @return 是否成功
+     * [已修改] 增加冻结检查
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -313,21 +307,18 @@ public class UserServiceImpl implements UserService {
         if (user==null){
             throw new BusinessException(0,"用户 {"+userName+"} 不存在");
         }
-//        Assert.notNull(user, "用户 '{}' 不存在", userName);
-
-        // 在实际项目中，密码必须经过加密处理
-        // String encodedPassword = passwordEncoder.encode(withdrawalPassword);
+        // [修改] 增加冻结检查
+        checkUserFrozen(user);
 
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getUserName, userName)
-                .set(User::getWithdrawalPassword, withdrawalPassword); // 实际应为 encodedPassword
+                .set(User::getWithdrawalPassword, withdrawalPassword);
 
         return userMapper.update(null, updateWrapper) > 0;
     }
 
     @Override
     public User selectByUserName(UserDTO userDTO) {
-
         LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(User::getUserName,userDTO.getUserName());
         return userMapper.selectOne(lambdaQueryWrapper);
@@ -345,16 +336,59 @@ public class UserServiceImpl implements UserService {
     }
     /**
      * 为用户首次绑定银行卡
-     * @param userId   用户ID
-     * @param bankCard 银行卡号
-     * @return 是否成功
+     * [已修改] 增加冻结检查
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
     public boolean addBankCardForUser(Long userId, String bankCard) {
-        // 1. 参数校验
         if (!StringUtils.hasText(bankCard)) {
             throw new BusinessException(0, "银行卡号不能为空");
+        }
+
+        User user = userMapper.selectById(userId);
+        if (Objects.isNull(user)) {
+            throw new BusinessException(0, "用户不存在");
+        }
+
+        // [修改] 增加冻结检查
+        checkUserFrozen(user);
+
+        if (StringUtils.hasText(user.getBankCard())) {
+            throw new BusinessException(0, "您已绑定银行卡，不可重复操作");
+        }
+
+        LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(User::getId, userId)
+                .set(User::getBankCard, bankCard);
+
+        return userMapper.update(null, updateWrapper) > 0;
+    }
+
+    // --- 辅助私有方法 ---
+    /**
+     * 检查用户是否被冻结
+     * @param user 用户对象
+     */
+    private void checkUserFrozen(User user) {
+        if (user != null && user.getIsFrozen()) {
+            throw new BusinessException(0, "您的账户已被冻结，无法执行此操作");
+        }
+    }
+
+    /**
+     * [新增] 为用户首次绑定姓名和银行详细信息
+     * @param userId 用户ID
+     * @param realName 真实姓名
+     * @param bankName 银行名称
+     * @param bankBranch 开户行
+     * @return 是否成功
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public boolean addBankDetails(Long userId, String realName, String bankName, String bankBranch) {
+        // 1. 参数校验
+        if (!StringUtils.hasText(realName) || !StringUtils.hasText(bankName) || !StringUtils.hasText(bankBranch)) {
+            throw new BusinessException(0, "姓名、银行名称和开户行均不能为空");
         }
 
         // 2. 获取用户信息
@@ -363,17 +397,43 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(0, "用户不存在");
         }
 
-        // 3. 核心逻辑：检查用户是否已绑定银行卡
-        //    使用 StringUtils.hasText() 可以同时判断 null, "", " " 等情况
-        if (StringUtils.hasText(user.getBankCard())) {
-            throw new BusinessException(0, "您已绑定银行卡，不可重复操作");
+        // 3. 检查账户是否被冻结
+        checkUserFrozen(user);
+
+        // 4. 核心逻辑：检查用户是否已设置过这些信息
+        if (StringUtils.hasText(user.getRealName()) || StringUtils.hasText(user.getBankName()) || StringUtils.hasText(user.getBankBranch())) {
+            throw new BusinessException(0, "您已设置过相关信息，不可重复操作");
         }
 
-        // 4. 执行更新
+        // 5. 执行更新
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getId, userId)
-                .set(User::getBankCard, bankCard);
+                .set(User::getRealName, realName)
+                .set(User::getBankName, bankName)
+                .set(User::getBankBranch, bankBranch);
 
         return userMapper.update(null, updateWrapper) > 0;
     }
+
+    /**
+     * [新增] (管理员)冻结或解冻用户
+     * @param userName 用户名
+     * @param freeze true为冻结, false为解冻
+     * @return 是否成功
+     */
+    @Transactional
+    @Override
+    public boolean toggleUserFreezeStatus(String userName, boolean freeze) {
+        User user = this.queryUser(userName);
+        if (user == null) {
+            throw new BusinessException(0, "用户 {" + userName + "} 不存在");
+        }
+
+        LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(User::getUserName, userName)
+                .set(User::getIsFrozen, freeze);
+
+        return userMapper.update(null, updateWrapper) > 0;
+    }
+
 }

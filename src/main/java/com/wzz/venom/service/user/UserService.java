@@ -109,4 +109,10 @@ public interface UserService {
 
     @Transactional(rollbackFor = Exception.class)
     boolean addBankCardForUser(Long userId, String bankCard);
+
+    @Transactional(rollbackFor = Exception.class)
+    boolean addBankDetails(Long userId, String realName, String bankName, String bankBranch);
+
+    @Transactional
+    boolean toggleUserFreezeStatus(String userName, boolean freeze);
 }

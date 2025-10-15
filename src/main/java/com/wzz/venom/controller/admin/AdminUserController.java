@@ -138,6 +138,23 @@ public class AdminUserController {
         }
     }
 
+    /**
+     * 【新增】(管理员)冻结或解冻用户
+     * @param userName 用户名
+     * @param freeze   是否冻结
+     * @return 通用响应结果
+     */
+    @PostMapping("/admin/toggleFreeze")
+    public Result<?> toggleUserFreezeStatus(@RequestParam String userName, @RequestParam Boolean freeze) {
+        try {
+            boolean success = userService.toggleUserFreezeStatus(userName, freeze);
+            String action = freeze ? "冻结" : "解冻";
+            return success ? Result.success("用户 " + userName + " " + action + "成功") : Result.error("操作失败");
+        } catch (BusinessException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     /*
      * 备注:
      * 1. 原始 Controller 模板中的 /deleteInfo 接口与 /delete 接口功能高度重合，

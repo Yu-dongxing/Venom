@@ -42,6 +42,7 @@ public class UserWebSocketController extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         Long userId = (Long) session.getAttributes().get("userId");
+        String userName = session.getAttributes().get("user").toString();
         if (userId == null) {
             log.error("WebSocket 连接失败：无法从 session attributes 中获取 userId");
             try {
@@ -95,7 +96,7 @@ public class UserWebSocketController extends TextWebSocketHandler {
             // 5. 新增：在处理用户消息后，立即通知管理员
             // 我们将整个消息体作为数据转发给管理员
             Object data = msgMap.get("data");
-            adminWebSocketController.notifyAdminGenericUserEvent(userId, event, data);
+
 
 
             // 根据事件类型进行分发处理
@@ -103,6 +104,7 @@ public class UserWebSocketController extends TextWebSocketHandler {
                 case "FINANCIAL_TRANSFER_IN":
                     // 用户理财转入
                     log.info("后台通知：用户 [ID: {}] 发起理财转入操作，数据: {}", userId, data);
+                    adminWebSocketController.notifyAdminGenericUserEvent(userId, event, data);
 
                     // 在这里可以调用你的业务 Service 进行处理
                     // e.g., financeService.handleTransfer(userId, data);
@@ -110,6 +112,7 @@ public class UserWebSocketController extends TextWebSocketHandler {
                 case "FINANCIAL_TRANSFER_OUT":
                     // 用户理财转出
                     log.info("后台通知：用户 [ID: {}] 发起理财转出操作，数据: {}", userId, data);
+                    adminWebSocketController.notifyAdminGenericUserEvent(userId, event, data);
 
                     // 在这里可以调用你的业务 Service 进行处理
                     // e.g., financeService.handleTransfer(userId, data);
@@ -118,6 +121,7 @@ public class UserWebSocketController extends TextWebSocketHandler {
                 case "CONTACT_SUPPORT":
                     // 用户点击客服通知
                     log.info("后台通知：用户 [ID: {}] 请求人工客服支持。", userId);
+                    adminWebSocketController.notifyAdminGenericUserEvent(userId, event, data);
                     // 在这里可以调用你的业务 Service，例如创建一个客服工单
                     // e.g., supportService.createTicket(userId);
                     break;

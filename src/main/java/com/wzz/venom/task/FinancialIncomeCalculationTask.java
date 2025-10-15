@@ -124,8 +124,8 @@ public class FinancialIncomeCalculationTask {
 
         log.info("为用户 '{}' 计算理财收益：本金 {}, 收益率 {}, 收益 {}", userName, principal, dailyRate, earnings);
 
-        // 5. 【核心修改】将收益增加到用户的理财本金中，实现复利
-        boolean updateSuccess = userFinancialService.increaseUserFinancialBalance(userName, earnings.doubleValue());
+        // 5. 【核心修改】将收益增加到用户的理财本金中
+        boolean updateSuccess = userFinancialService.increaseUserFinancialBalanceIncome(userName, earnings.doubleValue());
         if (!updateSuccess) {
             // 抛出异常，触发事务回滚
             throw new RuntimeException("更新用户理财本金失败！");

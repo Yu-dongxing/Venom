@@ -1,6 +1,8 @@
 package com.wzz.venom.service.user;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wzz.venom.domain.entity.UserFinancial;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -57,11 +59,16 @@ public interface UserFinancialService {
      */
     boolean increaseUserFinancialBalance(String user, Double amount);
 
+    @Transactional(rollbackFor = Exception.class) // 确保任何异常都会回滚整个事务
+    boolean increaseUserFinancialBalanceIncome(String user, Double amount);
+
     /**
      * [新增] 查询所有用户理财信息 (供管理端使用)
      * @return 所有理财信息列表
      */
     List<UserFinancial> findAll();
+
+    Page<UserFinancial> findAllByPage(Page<UserFinancial> page);
 
     /**
      * [新增] 根据ID删除指定理财信息 (供管理端使用)

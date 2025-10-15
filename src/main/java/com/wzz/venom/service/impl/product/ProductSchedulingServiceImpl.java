@@ -68,7 +68,8 @@ public class ProductSchedulingServiceImpl implements ProductSchedulingService {
      * 这是为了防止服务重启导致内存中的定时任务丢失
      */
     //todo
-//    @PostConstruct
+    @PostConstruct
+    @Override
     public void reschedulePendingTasksOnStartup() {
         log.info("服务启动，开始重新调度未完成的产品结算任务...");
         QueryWrapper<UserProduct> queryWrapper = new QueryWrapper<>();

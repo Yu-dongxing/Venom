@@ -2,6 +2,7 @@ package com.wzz.venom.service.product;
 
 
 import com.wzz.venom.domain.entity.UserProduct;
+import jakarta.annotation.PostConstruct;
 
 /**
  * 产品结算任务调度服务接口
@@ -13,6 +14,10 @@ public interface ProductSchedulingService {
      * @param product 用户购买的产品实体，必须包含ID和endTime
      */
     void scheduleProductSettlement(UserProduct product);
+
+    //todo
+    @PostConstruct
+    void reschedulePendingTasksOnStartup();
 
     /**
      * 取消一个产品的结算任务（如果需要）

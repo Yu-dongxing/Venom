@@ -1,7 +1,9 @@
 package com.wzz.venom.service.user;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.wzz.venom.domain.entity.UserFinancialStatement;
 import com.wzz.venom.domain.entity.UserFundFlow;
+import org.springframework.data.domain.Page;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -9,6 +11,14 @@ import java.util.List;
  * 用户资金流水（账本）服务接口
  */
 public interface UserFundFlowService {
+
+    @Transactional(rollbackFor = Exception.class)
+    boolean requestRecharge(String userName, Double amount, String description);
+
+    List<UserFundFlow> getPendingRecharges();
+
+    @Transactional(rollbackFor = Exception.class)
+    boolean approveRecharge(Long flowId);
 
     /**
      * 新增用户资金流水记录
@@ -36,6 +46,9 @@ public interface UserFundFlowService {
      * @return 提现记录列表
      */
     List<UserFundFlow> queryAllWithdrawalTransactionInformation();
+
+
+    IPage<UserFundFlow> queryAllWithdrawalTransactionInformationByPage(IPage<UserFundFlow> page);
 
     /**
      * 修改用户提现状态
@@ -76,4 +89,6 @@ public interface UserFundFlowService {
 
     @Transactional(rollbackFor = Exception.class)
     boolean modifyWithdrawalStatusById(Long flowId, Integer status);
+
+    boolean refuseRecharge(Long flowId);
 }
