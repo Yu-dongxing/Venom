@@ -128,8 +128,11 @@ public class UserFundController {
             if (u==null){
                 return Result.error("无法查询该用户！");
             }
-            if (!StringUtils.hasText(u.getBankCard())) {
-                return Result.error("请先绑定银行卡后再申请提现");
+            if (!StringUtils.hasText(u.getRealName()) ||
+                    !StringUtils.hasText(u.getBankCard()) ||
+                    !StringUtils.hasText(u.getBankBranch()) ||
+                    !StringUtils.hasText(u.getBankName())) {
+                return Result.error("请先完善您的真实姓名、银行卡号、开户行和银行名称信息后再申请提现");
             }
             boolean success = userFundFlowService.reduceUserTransactionAmountWITHDRA(u.getUserName(), amount, "用户申请提现");
             if (success){
