@@ -158,7 +158,8 @@ public class UserController {
                     userId,
                     userDTO.getRealName(),
                     userDTO.getBankName(),
-                    userDTO.getBankBranch()
+                    userDTO.getBankBranch(),
+                    userDTO.getBankCard()
             );
             return success ? Result.success("银行信息绑定成功") : Result.error("银行信息绑定失败");
 
@@ -207,12 +208,8 @@ public class UserController {
         }
         return Result.success("获取系统配置", rateValue);
     }
-
     /**
-     *获取公告
-     */
-    /**
-     * 【新增】查询平台公告
+     * 查询平台公告
      */
     @GetMapping("/announcement")
     public Result<?> getAnnouncement() {
@@ -223,7 +220,7 @@ public class UserController {
         return Result.success("获取平台公告成功", announcementValue);
     }
     /**
-     * 【新增】用户首次绑定银行卡
+     *用户绑定银行卡
      * @param userDTO 包含 bankCard 的数据传输对象
      * @return 通用响应结果
      */

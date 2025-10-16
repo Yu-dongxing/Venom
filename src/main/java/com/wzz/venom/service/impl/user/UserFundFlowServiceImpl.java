@@ -370,8 +370,8 @@ public class UserFundFlowServiceImpl implements UserFundFlowService {
 
         if (Objects.equals(WITHDRAW_STATUS_REJECTED, status)) {
             BigDecimal returnAmount = withdrawalFlow.getAmount().abs();
-            String description = String.format("提现申请[ID:%d]被管理员拒绝，资金返还", flowId);
-            addFlowRecord(withdrawalFlow.getUserName(), returnAmount, FUND_TYPE_WITHDRAW_REFUND, description);
+            String description = String.format("提现申请[ID:%d]被管理员拒绝，资金返还（充值）", flowId);
+            addFlowRecord(withdrawalFlow.getUserName(), returnAmount, "RECHARGE", description);
             withdrawalFlow.setStatus(STATUS_FAILED);
 
         } else if (Objects.equals(WITHDRAW_STATUS_APPROVED, status)) {

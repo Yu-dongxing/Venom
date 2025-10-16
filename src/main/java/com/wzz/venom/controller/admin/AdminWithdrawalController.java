@@ -110,31 +110,18 @@ public class AdminWithdrawalController {
      */
     @PostMapping("/updateById")
     public Result<?> updateWithdrawalStatusById(@Valid @RequestBody UpdateWithdrawalStatusByIdDTO dto) {
-        // 1. 参数校验已通过 DTO 中的注解完成
-
-        // 2. 状态值合法性校验 (在Service层也有校验，这里是Controller层的快速失败)
-        // 根据Service层的常量，0=通过, 2=拒绝
         final int STATUS_APPROVED = 0;
         final int STATUS_REJECTED = 2;
         if (dto.getStatus() != STATUS_APPROVED && dto.getStatus() != STATUS_REJECTED) {
             return Result.error(400, "无效的状态值，必须是 " + STATUS_APPROVED + " (通过) 或 " + STATUS_REJECTED + " (拒绝)");
         }
-
         try {
-            // 3. 调用Service层方法
             userFundFlowService.modifyWithdrawalStatusById(dto.getId(), dto.getStatus());
-
-            // 4. 封装成功响应
             String action = dto.getStatus() == STATUS_APPROVED ? "通过" : "拒绝";
             return Result.success("提现申请审核成功，操作：" + action);
-
         } catch (BusinessException e) {
-            // 捕获Service层主动抛出的业务异常，将信息返回给前端
-            // log.error("审核提现[ID:{}]失败: {}", dto.getFlowId(), e.getMessage());
             return Result.error(e.getMessage());
         } catch (Exception e) {
-            // 捕获其他未知异常，防止敏感信息泄露
-            // log.error("审核提现[ID:{}]时发生系统错误", dto.getFlowId(), e);
             return Result.error("服务器内部错误，操作失败！");
         }
     }

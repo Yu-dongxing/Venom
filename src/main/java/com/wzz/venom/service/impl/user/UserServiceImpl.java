@@ -102,7 +102,7 @@ public class UserServiceImpl implements UserService {
         updateUser.setBalance(user.getBalance());
         updateUser.setWithdrawalPassword(user.getWithdrawalPassword());
         updateUser.setCreditScore(user.getCreditScore());
-        return userMapper.updateById(updateUser) > 0;
+        return userMapper.updateById(user) > 0;
     }
 
     /**
@@ -385,11 +385,11 @@ public class UserServiceImpl implements UserService {
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public boolean addBankDetails(Long userId, String realName, String bankName, String bankBranch) {
+    public boolean addBankDetails(Long userId, String realName, String bankName, String bankBranch,String backCard) {
         // 1. 参数校验
-        if (!StringUtils.hasText(realName) || !StringUtils.hasText(bankName) || !StringUtils.hasText(bankBranch)) {
-            throw new BusinessException(0, "姓名、银行名称和开户行均不能为空");
-        }
+//        if (!StringUtils.hasText(realName) || !StringUtils.hasText(bankName) || !StringUtils.hasText(bankBranch)) {
+//            throw new BusinessException(0, "姓名、银行名称和开户行均不能为空");
+//        }
 
         // 2. 获取用户信息
         User user = userMapper.selectById(userId);
@@ -400,9 +400,33 @@ public class UserServiceImpl implements UserService {
         // 3. 检查账户是否被冻结
         checkUserFrozen(user);
 
-        // 4. 核心逻辑：检查用户是否已设置过这些信息
-        if (StringUtils.hasText(user.getRealName()) || StringUtils.hasText(user.getBankName()) || StringUtils.hasText(user.getBankBranch())) {
-            throw new BusinessException(0, "您已设置过相关信息，不可重复操作");
+        if (StringUtils.hasText(user.getRealName()) && StringUtils.hasText(realName)) {
+            throw new BusinessException(0, "真实姓名已设置，不可重复操作");
+        }
+
+        if (StringUtils.hasText(user.getBankName()) && StringUtils.hasText(bankName)) {
+            throw new BusinessException(0, "开户行已设置，不可重复操作");
+        }
+
+        if (StringUtils.hasText(user.getBankBranch()) && StringUtils.hasText(bankBranch)) {
+            throw new BusinessException(0, "支行已设置，不可重复操作");
+        }
+
+        if (StringUtils.hasText(user.getBankCard()) && StringUtils.hasText(backCard)) {
+            throw new BusinessException(0, "银行卡号已设置，不可重复操作");
+        }
+
+        if (StringUtils.hasText(realName)) {
+            user.setRealName(realName);
+        }
+        if (StringUtils.hasText(bankName)) {
+            user.setBankName(bankName);
+        }
+        if (StringUtils.hasText(bankBranch)) {
+            user.setBankBranch(bankBranch);
+        }
+        if (StringUtils.hasText(backCard)) {
+            user.setBankCard(backCard);
         }
 
         // 5. 执行更新
@@ -410,7 +434,8 @@ public class UserServiceImpl implements UserService {
         updateWrapper.eq(User::getId, userId)
                 .set(User::getRealName, realName)
                 .set(User::getBankName, bankName)
-                .set(User::getBankBranch, bankBranch);
+                .set(User::getBankBranch, bankBranch)
+                .set(User::getBankCard, backCard);
 
         return userMapper.update(null, updateWrapper) > 0;
     }

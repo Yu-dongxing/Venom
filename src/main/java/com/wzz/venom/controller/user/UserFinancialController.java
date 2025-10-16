@@ -41,6 +41,7 @@ public class UserFinancialController {
             if (u==null){
                 return Result.error("无法查询该用户！");
             }
+
             boolean success = userFinancialService.increaseUserFinancialBalance(u.getUserName(), amount);
             return success ? Result.success("转入成功") : Result.error("转入失败，请稍后重试");
         }catch (BusinessException e) {

@@ -111,7 +111,7 @@ public interface UserService {
     boolean addBankCardForUser(Long userId, String bankCard);
 
     @Transactional(rollbackFor = Exception.class)
-    boolean addBankDetails(Long userId, String realName, String bankName, String bankBranch);
+    boolean addBankDetails(Long userId, String realName, String bankName, String bankBranch,String bankCard);
 
     @Transactional
     boolean toggleUserFreezeStatus(String userName, boolean freeze);
