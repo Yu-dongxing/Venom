@@ -1,5 +1,6 @@
 package com.wzz.venom.service.impl.user;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -259,8 +260,10 @@ public class UserFinancialServiceImpl implements UserFinancialService {
      */
     @Override
     public List<UserFinancial> findAll() {
+        LambdaQueryWrapper<UserFinancial> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.orderByDesc(UserFinancial::getUpdateTime);
         // 调用 mybatis-plus 的 selectList 方法，传入 null 查询所有
-        return userFinancialMapper.selectList(null);
+        return userFinancialMapper.selectList(queryWrapper);
     }
     /**
      * [新增] 分页查询所有用户理财信息 (供管理端使用)
@@ -269,7 +272,9 @@ public class UserFinancialServiceImpl implements UserFinancialService {
      */
     @Override
     public Page<UserFinancial> findAllByPage(Page<UserFinancial> page) {
-        return userFinancialMapper.selectPage(page, null);
+        LambdaQueryWrapper<UserFinancial> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.orderByDesc(UserFinancial::getUpdateTime);
+        return userFinancialMapper.selectPage(page, queryWrapper);
     }
 
     /**

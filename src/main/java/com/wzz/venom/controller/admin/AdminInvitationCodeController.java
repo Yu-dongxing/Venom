@@ -1,5 +1,6 @@
 package com.wzz.venom.controller.admin;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.entity.InvitationCode;
 import com.wzz.venom.service.InvitationCode.InvitationCodeService;
@@ -36,7 +37,9 @@ public class AdminInvitationCodeController {
      */
     @GetMapping("/find/all")
     public Result<?> findAll(){
-        List<InvitationCode> s = invitationCodeService.list();
+        LambdaQueryWrapper<InvitationCode> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.orderByDesc(InvitationCode::getUpdateTime);
+        List<InvitationCode> s = invitationCodeService.list(queryWrapper);
         if (!s.isEmpty()){
             return Result.success("查询成功",s);
         }

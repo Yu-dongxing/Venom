@@ -1,6 +1,7 @@
 package com.wzz.venom.controller.user;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.wzz.venom.annotation.CheckUserFrozen;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.dto.UserProductDTO;
 import com.wzz.venom.domain.entity.User;
@@ -44,6 +45,7 @@ public class UserProductController {
      * @param productDTO 包含用户、产品、金额等信息的数据传输对象
      * @return Result
      */
+    @CheckUserFrozen
     @PostMapping("/submitOrder")
     public Result<?> userSubmitsOrder(@RequestBody UserProductDTO productDTO) {
         productDTO.setCycleType("s");

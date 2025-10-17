@@ -1,6 +1,7 @@
 package com.wzz.venom.controller.user;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.wzz.venom.annotation.CheckUserFrozen;
 import com.wzz.venom.common.Result; // 假设这是您的统一返回结果类
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.domain.entity.UserFundFlow;
@@ -39,6 +40,7 @@ public class UserFundController {
      * @param amount 充值金额
      * @return Result
      */
+    @CheckUserFrozen
     @PostMapping("/recharge")
     public Result<?> userSubmitsRechargeRequest(@RequestParam Double amount) {
         if (amount <= 0) {
@@ -116,6 +118,7 @@ public class UserFundController {
     /**
      * 用户提交提现申请
      */
+    @CheckUserFrozen
     @PostMapping("/withdraw")
     public Result<?> userSubmitsWithdrawalRequest(@RequestParam Double amount) {
         if (amount <= 0) {

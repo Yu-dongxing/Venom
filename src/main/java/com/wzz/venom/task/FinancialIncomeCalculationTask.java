@@ -54,16 +54,24 @@ public class FinancialIncomeCalculationTask {
     public void calculateDailyFinancialIncome() {
         log.info("【每日理财收益计算任务】开始执行...");
 
-        // 1. 从系统配置中获取日收益率
+        // 1. 从系统配置中获取年收益率
         Object rateValue = sysConfigService.getConfigValueByNameAndKey(SYS_CONFIG_NAME, FINANCIAL_RATE_KEY);
         if (rateValue == null) {
             log.error("【每日理财收益计算任务】执行失败：未在 sys_config 表中找到名为 '{}' 的配置项。使用默认值 0.2", FINANCIAL_RATE_KEY);
-            rateValue = new BigDecimal("0.2");
+            rateValue = new BigDecimal("2");
         }
+        //计算日益率
+
 
         BigDecimal dailyRate;
         try {
-            dailyRate = new BigDecimal(rateValue.toString());
+            BigDecimal dayRates = new BigDecimal(rateValue.toString())
+                    .divide(new BigDecimal(365), 10, RoundingMode.HALF_UP) // 先保留足够精度
+                    .setScale(2, RoundingMode.HALF_UP); // 再保留两位小数
+
+            log.info("计算年收益率{} --的日收益率{}",rateValue,dayRates);
+//            dailyRate = new BigDecimal(rateValue.toString());
+            dailyRate = dayRates;
         } catch (NumberFormatException e) {
             log.error("【每日理财收益计算任务】执行失败：理财收益率配置值 '{}' 不是有效的数字。", rateValue);
             return;

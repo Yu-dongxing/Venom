@@ -432,11 +432,10 @@ public class UserServiceImpl implements UserService {
         // 5. 执行更新
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getId, userId)
-                .set(User::getRealName, realName)
-                .set(User::getBankName, bankName)
-                .set(User::getBankBranch, bankBranch)
-                .set(User::getBankCard, backCard);
-
+                .set(User::getRealName, user.getRealName())
+                .set(User::getBankName, user.getBankName())
+                .set(User::getBankBranch, user.getBankBranch())
+                .set(User::getBankCard, user.getBankCard());
         return userMapper.update(null, updateWrapper) > 0;
     }
 
@@ -453,7 +452,6 @@ public class UserServiceImpl implements UserService {
         if (user == null) {
             throw new BusinessException(0, "用户 {" + userName + "} 不存在");
         }
-
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getUserName, userName)
                 .set(User::getIsFrozen, freeze);

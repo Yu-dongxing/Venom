@@ -1,6 +1,7 @@
 package com.wzz.venom.controller.user;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.wzz.venom.annotation.CheckUserFrozen;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.entity.User;
 import com.wzz.venom.domain.entity.UserFinancial;
@@ -32,6 +33,7 @@ public class UserFinancialController {
      * @param amount 转入金额
      * @return 操作结果
      */
+    @CheckUserFrozen
     @PostMapping("/transferIn")
     public Result<?> userTransfersToFinancialManagement(@RequestParam Double amount) {
         try {
@@ -55,6 +57,7 @@ public class UserFinancialController {
      * @param amount 转出金额
      * @return 操作结果
      */
+    @CheckUserFrozen
     @PostMapping("/transferOut")
     public Result<?> userTransfersOutFinancialManagement(@RequestParam Double amount) {
         try {

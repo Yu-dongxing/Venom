@@ -1,6 +1,7 @@
 package com.wzz.venom.controller.user;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.wzz.venom.annotation.CheckUserFrozen;
 import com.wzz.venom.common.Result;
 import com.wzz.venom.domain.dto.UserDTO;
 import com.wzz.venom.domain.entity.User;
@@ -46,8 +47,8 @@ public class UserController {
             if (!isValid) {
                 return Result.error("用户名或密码错误");
             }
-            /**
-             * 根据用户名查询用户
+            /*
+              根据用户名查询用户
              */
             User u = userService.selectByUserName(userDTO);
             if (u==null){
@@ -108,6 +109,7 @@ public class UserController {
      * 用户修改登录密码或提现密码
      * [已修改] 增加冻结检查
      */
+    @CheckUserFrozen
     @PostMapping("/changePassword")
     public Result<?> userChangesLoginPassword(@RequestBody UserDTO userDTO) {
         try {
@@ -147,6 +149,7 @@ public class UserController {
      * @param userDTO 包含 realName, bankName, bankBranch 的数据传输对象
      * @return 通用响应结果
      */
+    @CheckUserFrozen
     @PostMapping("/addBankDetails")
     public Result<?> addBankDetails(@RequestBody UserDTO userDTO) {
         try {
@@ -224,6 +227,7 @@ public class UserController {
      * @param userDTO 包含 bankCard 的数据传输对象
      * @return 通用响应结果
      */
+    @CheckUserFrozen
     @PostMapping("/addBankCard")
     public Result<?> addBankCard(@RequestBody UserDTO userDTO) {
         try {

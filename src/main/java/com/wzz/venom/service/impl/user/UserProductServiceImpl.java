@@ -109,8 +109,9 @@ public class UserProductServiceImpl extends ServiceImpl<UserProductMapper, UserP
     @Override
     public List<UserProduct> searchForProductsHeldByUsersBasedOnTheirOwnership(String userName) {
         // 使用QueryWrapper构造查询条件
-        QueryWrapper<UserProduct> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("user_name", userName);
+        LambdaQueryWrapper<UserProduct> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserProduct::getUserName, userName);
+        queryWrapper.orderByDesc(UserProduct::getUpdateTime);
         return userProductMapper.selectList(queryWrapper);
     }
 
