@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class InvitationCodeServiceImpl extends ServiceImpl<InvitationCodeMapper, InvitationCode> implements InvitationCodeService {
@@ -175,8 +176,7 @@ public class InvitationCodeServiceImpl extends ServiceImpl<InvitationCodeMapper,
      * 您可以根据业务需求自定义生成规则
      */
     private String generateUniqueCode() {
-        // 这里我们继续使用UUID简化版作为示例
-        // 在高并发场景下，需要考虑code的唯一性，可以增加重试或更复杂的生成算法
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        // 1000~9999 之间取随机数，保证 4 位
+        return String.valueOf(ThreadLocalRandom.current().nextInt(1000, 10000));
     }
 }
